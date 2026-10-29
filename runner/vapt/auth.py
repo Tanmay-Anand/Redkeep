@@ -1,7 +1,7 @@
 """Authentication helper for authenticated API passes.
 
-The CRM auth mechanism (JWT bearer vs session cookie) is confirmed from the
-codebase at Phase 4 and then described in config.yaml -> auth. This module turns
+The target app's auth mechanism (JWT bearer vs session cookie) is confirmed from
+the codebase at Phase 4 and then described in config.yaml -> auth. This module turns
 that config into either request headers (bearer) or cookies (session) by
 performing the configured login call against the LAB target.
 

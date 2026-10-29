@@ -17,7 +17,7 @@ class Config:
 
     # --- loading ---------------------------------------------------------------
     @classmethod
-    def load(cls, path: str | None = None) -> "Config":
+    def load(cls, path: str | None = None) -> Config:
         candidate = path or os.environ.get("REDKEEP_CONFIG") or "config.yaml"
         p = Path(candidate)
         if not p.exists():
@@ -25,7 +25,7 @@ class Config:
                 f"config not found: {p}. Copy config.example.yaml to config.yaml "
                 f"and edit it (or set REDKEEP_CONFIG)."
             )
-        with open(p, "r", encoding="utf-8") as fh:
+        with open(p, encoding="utf-8") as fh:
             return cls(yaml.safe_load(fh) or {}, p)
 
     # --- accessors -------------------------------------------------------------

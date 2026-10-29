@@ -1,27 +1,90 @@
-# Lab-only CI: validates the runner and the compose files. It NEVER runs a scan
-# or brings up a target — there is no authorised target in CI.
+# Lab-only CI: validates the runner, lints, type-checks, runs the safety-gate
+# tests, scans for secrets/CVEs/SAST issues, and validates the compose + Docker
+# files. It NEVER runs a scan or brings up a target — there is no authorised
+# target in CI (see docs/rules-of-engagement.md). The Kali image build + tool
+# smoke lives in image-smoke.yml (scheduled) because it is heavy.
 name: ci
 
 on:
   push:
   pull_request:
 
+# Least privilege: read-only token by default.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  runner:
+  lint-type-test:
+    name: lint · type · test (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: runner/pyproject.toml
+      - name: Install runner + dev tools
+        run: pip install "./runner[dev]"
+      - name: Ruff lint
+        run: ruff check runner/vapt ui
+      - name: Mypy (runner)
+        run: mypy runner/vapt
+      - name: Byte-compile
+        run: python -m compileall runner/vapt ui
+      - name: Pytest (safety gate + runner)
+        run: pytest runner/tests
+      - name: CLI smoke
+        run: vapt --help
+
+  security:
+    name: security scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - name: Install runner
-        run: pip install ./runner
-      - name: Byte-compile
-        run: python -m compileall runner/vapt
-      - name: CLI smoke
-        run: vapt --help
+          python-version: "3.12"
+      - name: Install runner + scanners
+        run: pip install "./runner" bandit pip-audit
+      - name: Bandit (Python SAST)
+        run: bandit -r runner/vapt ui -c runner/pyproject.toml
+      # Advisory: pip-audit surfaces known CVEs, but most live in transitive or
+      # dev/tooling packages (pip, pytest, starlette via schemathesis) with no
+      # actionable fix in our pins. Dependabot opens the real update PRs, so this
+      # reports in the logs without blocking merges. Re-enable blocking once the
+      # runtime deps are clean.
+      - name: pip-audit (dependency CVEs, advisory)
+        continue-on-error: true
+        run: pip-audit
+      - name: Secret scan (gitleaks)
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest \
+            detect --source=/repo --no-git --redact --verbose
+
+  dockerfile-lint:
+    name: dockerfile lint (hadolint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: lab/kali/Dockerfile
+          # Fail only on errors; apt/pip pin warnings are acceptable for a
+          # rolling-release pentest toolbox.
+          failure-threshold: error
 
   compose:
+    name: compose validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

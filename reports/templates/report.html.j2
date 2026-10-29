@@ -3,19 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Redkeep report — {{ product }}</title>
+<title>Redkeep report: {{ product }}</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii03LjAgLTQuMCA5NiA5NiI+PHN0eWxlPnBhdGh7c3Ryb2tlOiMyNjI2MjZ9QG1lZGlhIChwcmVmZXJzLWNvbG9yLXNjaGVtZTogZGFyayl7cGF0aHtzdHJva2U6I0YyRjJGMH19PC9zdHlsZT48cGF0aCBkPSJNNSA4MyBWNSBIMTUgVjE5IEgzNiBWNSBINDYgVjE5IEg2NyBWNSBINzcgVjgzIEg1NiBWNjAgQTE1IDE1IDAgMCAwIDI2IDYwIFY4MyBaIiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWpvaW49Im1pdGVyIi8+PC9zdmc+">
 <style>
+  {% if font_woff2_b64 %}
+  @font-face{font-family:'Space Grotesk';font-style:normal;font-weight:300 700;
+    font-display:swap;src:url(data:font/woff2;base64,{{ font_woff2_b64 }}) format('woff2')}
+  {% endif %}
   :root{
-    --bg:#0f1115; --panel:#171a21; --ink:#e7e9ee; --muted:#9aa3b2; --line:#272c36;
-    --crit:#b4232a; --high:#d9534f; --med:#e0a800; --low:#3a86c8; --info:#6c757d;
+    /* Surface tokens — shared with the launcher UI (ui/index.html). Near-black. */
+    --bg:#0a0a0b; --panel:#141417; --card:#1a1a1e; --ink:#F2F2F0; --muted:#9aa3b2; --line:#26262b;
+    /* Severity scale (CVSS v3.1 bands); every tag text pair is >=4.5:1 (WCAG AA). */
+    --crit:#b4232a; --high:#c0461f; --med:#e0a800; --low:#2f6fa8; --info:#5b636b;
+    --badge-fg:#ffffff; --badge-fg-med:#1b1f27;
+    --font-mono:ui-monospace,Menlo,Consolas,monospace;
   }
   @media (prefers-color-scheme: light){
-    :root{ --bg:#f6f7f9; --panel:#fff; --ink:#1b1f27; --muted:#5b6473; --line:#e4e7ec; }
+    :root{ --bg:#FAFAF8; --panel:#fff; --ink:#262626; --muted:#5b6473; --line:#e4e7ec; }
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
-    font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:32px 16px}
+    font:15px/1.5 'Space Grotesk',-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:32px 16px}
   .wrap{max-width:980px;margin:0 auto}
   h1{font-size:22px;margin:0 0 4px}
   .sub{color:var(--muted);margin:0 0 24px;font-size:13px}
@@ -27,15 +35,19 @@
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
   th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
-  .badge{display:inline-block;padding:2px 9px;border-radius:999px;color:#fff;font-size:12px;font-weight:600}
-  .Critical{background:var(--crit)} .High{background:var(--high)} .Medium{background:var(--med);color:#1b1f27}
-  .Low{background:var(--low)} .Info{background:var(--info)}
+  /* Squared mono severity tag — the one component for every severity surface. */
+  .sev{display:inline-block;min-width:46px;text-align:center;padding:3px 8px;border-radius:3px;
+    font:600 11px/1.35 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--badge-fg);white-space:nowrap}
+  .sev-crit{background:var(--crit)} .sev-high{background:var(--high)} .sev-med{background:var(--med);color:var(--badge-fg-med)}
+  .sev-low{background:var(--low)} .sev-info{background:var(--info)}
   .tool{font-size:12px;color:var(--muted)}
   code{background:rgba(127,127,127,.15);padding:1px 5px;border-radius:5px;font-size:12px}
   footer{color:var(--muted);font-size:12px;margin-top:28px;line-height:1.7}
 </style>
 </head>
 <body>
+{% set ABBR = {'Critical':'CRIT','High':'HIGH','Medium':'MED','Low':'LOW','Info':'INFO'} %}
+{% set SEVCLS = {'Critical':'crit','High':'high','Medium':'med','Low':'low','Info':'info'} %}
 <div class="wrap">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
     <svg viewBox="-7 -4 96 96" width="32" height="34" style="flex:none" aria-label="Redkeep">
@@ -43,16 +55,16 @@
       <path class="rk" d="M5 83 V5 H15 V19 H36 V5 H46 V19 H67 V5 H77 V83 H56 V60 A15 15 0 0 0 26 60 V83 Z"
             fill="none" stroke-width="10" stroke-linejoin="miter"/>
     </svg>
-    <h1 style="margin:0">Redkeep VAPT report — {{ product }}</h1>
+    <h1 style="margin:0">Redkeep VAPT report: {{ product }}</h1>
   </div>
-  <p class="sub">Engagement <strong>{{ engagement }}</strong> · generated {{ generated }} · source <code>{{ run_dir }}</code></p>
+  <p class="sub">Engagement <strong>{{ engagement }}</strong>&nbsp;&nbsp;&nbsp;generated {{ generated }}&nbsp;&nbsp;&nbsp;source <code>{{ run_dir }}</code></p>
 
   <div class="panel">
     <div class="cards">
       {% for sev in severity_order %}
       <div class="card">
         <div class="n">{{ summary[sev] }}</div>
-        <div class="l"><span class="badge {{ sev }}">{{ sev }}</span></div>
+        <div class="l"><span class="sev sev-{{ SEVCLS[sev] }}">{{ ABBR[sev] }}</span></div>
       </div>
       {% endfor %}
     </div>
@@ -68,7 +80,7 @@
       <tbody>
         {% for f in findings %}
         <tr>
-          <td><span class="badge {{ f.severity }}">{{ f.severity }}</span></td>
+          <td><span class="sev sev-{{ SEVCLS[f.severity] }}">{{ ABBR[f.severity] }}</span></td>
           <td>{{ f.name }}</td>
           <td class="tool">{{ f.tool }}</td>
           <td>{{ f.count }}</td>

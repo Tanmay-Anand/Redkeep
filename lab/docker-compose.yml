@@ -1,13 +1,13 @@
 # Redkeep isolated lab.
 #
-# Brings up a DISPOSABLE copy of the full builder-crm service set plus a Kali
+# Brings up a DISPOSABLE copy of the full example-app service set plus a Kali
 # toolbox, all on a private bridge network (redkeep-lab). The target services
 # publish NO host ports — they are reachable only from inside the lab network
 # (i.e. from the Kali toolbox and the runner). This is the isolation boundary.
 #
-# The CRM services are built from the real repos via build-context paths set in
-# lab/target/.env (copy lab/target/.env.example). Redkeep never edits those
-# repos; it only references them read-only as build contexts.
+# The target services are built from the real app repos via build-context paths
+# set in lab/target/.env (copy lab/target/.env.example). Redkeep never edits
+# those repos; it only references them read-only as build contexts.
 #
 # DefectDojo (the findings hub) runs from hub/docker-compose.yml and is reached
 # by the runner over host.docker.internal / localhost — see hub/README.md.
@@ -29,9 +29,9 @@ services:
   target-db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${DB_USER:-crm}
+      POSTGRES_USER: ${DB_USER:-app}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-throwaway-lab-only}
-      POSTGRES_DB: ${DB_NAME:-crm}
+      POSTGRES_DB: ${DB_NAME:-app}
     volumes:
       - target-db-data:/var/lib/postgresql/data
       - ./target/seed:/docker-entrypoint-initdb.d:ro
@@ -42,7 +42,7 @@ services:
 
   target-api:
     build:
-      context: ${CRM_API_PATH:?set CRM_API_PATH in lab/target/.env}
+      context: ${TARGET_API_PATH:?set TARGET_API_PATH in lab/target/.env}
     env_file:
       - ./target/.env
     depends_on: [target-db]
@@ -52,7 +52,7 @@ services:
 
   target-platform:
     build:
-      context: ${CRM_PLATFORM_PATH:?set CRM_PLATFORM_PATH in lab/target/.env}
+      context: ${TARGET_PLATFORM_PATH:?set TARGET_PLATFORM_PATH in lab/target/.env}
     env_file:
       - ./target/.env
     depends_on: [target-db]
@@ -60,29 +60,29 @@ services:
       redkeep-lab:
         aliases: [target-platform]
 
-  target-post-sales:
+  target-admin:
     build:
-      context: ${CRM_POST_SALES_PATH:?set CRM_POST_SALES_PATH in lab/target/.env}
+      context: ${TARGET_ADMIN_PATH:?set TARGET_ADMIN_PATH in lab/target/.env}
     env_file:
       - ./target/.env
     depends_on: [target-db]
     networks:
       redkeep-lab:
-        aliases: [target-post-sales]
+        aliases: [target-admin]
 
-  target-reports-api:
+  target-reports:
     build:
-      context: ${CRM_REPORTS_API_PATH:?set CRM_REPORTS_API_PATH in lab/target/.env}
+      context: ${TARGET_REPORTS_PATH:?set TARGET_REPORTS_PATH in lab/target/.env}
     env_file:
       - ./target/.env
     depends_on: [target-db]
     networks:
       redkeep-lab:
-        aliases: [target-reports-api]
+        aliases: [target-reports]
 
   target-ui:
     build:
-      context: ${CRM_UI_PATH:?set CRM_UI_PATH in lab/target/.env}
+      context: ${TARGET_UI_PATH:?set TARGET_UI_PATH in lab/target/.env}
     env_file:
       - ./target/.env
     depends_on: [target-api]

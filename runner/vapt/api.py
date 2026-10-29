@@ -2,7 +2,7 @@
 
 schemathesis drives property/fuzz tests straight from each service's OpenAPI
 spec. ZAP imports the same spec and active-scans it. Both can run authenticated
-using the headers produced by ``vapt.auth`` (confirmed from the CRM at Phase 4).
+using the headers produced by ``vapt.auth`` (confirmed from the target app at Phase 4).
 """
 from __future__ import annotations
 

@@ -28,9 +28,11 @@ UI_DIR = REPO_ROOT / "ui"
 LAB = ["docker", "compose", "-f", "lab/docker-compose.yml"]
 HUB = ["docker", "compose", "-f", "hub/docker-compose.yml"]
 TARGETS = ["target-db", "target-api", "target-platform",
-           "target-post-sales", "target-reports-api", "target-ui"]
+           "target-admin", "target-reports", "target-ui"]
 JOB_DIR = REPO_ROOT / "reports" / "output" / ".jobs"
 VALID_DOMAINS = {"run", "network", "web", "api"}
+# Teardown actions may interrupt a running job (e.g. a slow/stuck lab-up).
+TEARDOWN_ACTIONS = {"lab-down", "down-all"}
 
 # ---- job state (one job at a time keeps resource use low) --------------------
 _lock = threading.Lock()
@@ -85,10 +87,35 @@ def _run_job(cmd: list[str], label: str) -> None:
         _job.update(status="done", returncode=rc, proc=None)
 
 
+def _terminate_running(timeout: float = 8.0) -> None:
+    """Terminate the current job's process and wait (bounded) for it to finish.
+
+    Lets a teardown action interrupt a slow or stuck job (e.g. a 'Start lab' that
+    is still pulling/building images) instead of the teardown being refused.
+    """
+    with _lock:
+        proc = _job.get("proc")
+    if proc is not None:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        with _lock:
+            if _job["status"] != "running":
+                return
+        time.sleep(0.1)
+
+
 def _start_job(kind: str, params: dict) -> tuple[int, dict]:
     with _lock:
-        if _job["status"] == "running":
-            return 409, {"error": "a job is already running"}
+        running = _job["status"] == "running"
+    if running:
+        if kind in TEARDOWN_ACTIONS:
+            _terminate_running()          # teardown preempts a running job
+        else:
+            return 409, {"error": "a job is already running — stop it first"}
     try:
         cmd, label = _command_for(kind, params)
     except ValueError as e:
@@ -134,7 +161,16 @@ def _runs() -> list[dict]:
     out = []
     for d in sorted((p for p in base.iterdir() if p.is_dir() and not p.name.startswith(".")),
                     reverse=True)[:25]:
-        out.append({"name": d.name, "report": (d / "report.html").exists()})
+        entry = {"name": d.name, "report": (d / "report.html").exists()}
+        sj = d / "summary.json"
+        if sj.exists():
+            try:
+                data = json.loads(sj.read_text(encoding="utf-8"))
+                entry["counts"] = data.get("counts")
+                entry["total"] = data.get("total")
+            except (OSError, json.JSONDecodeError):
+                pass
+        out.append(entry)
     return out
 
 
@@ -182,7 +218,8 @@ class Handler(BaseHTTPRequestHandler):
             if str(fp).startswith(str((REPO_ROOT / "resources").resolve())):
                 ext = fp.suffix.lower()
                 ctype = {".svg": "image/svg+xml", ".png": "image/png",
-                         ".ico": "image/x-icon"}.get(ext, "application/octet-stream")
+                         ".ico": "image/x-icon", ".woff2": "font/woff2",
+                         ".txt": "text/plain; charset=utf-8"}.get(ext, "application/octet-stream")
                 return self._serve_file(fp, ctype)
         if p.startswith("/report/"):
             fp = (REPO_ROOT / "reports" / "output" / p[len("/report/"):]).resolve()

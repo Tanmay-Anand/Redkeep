@@ -15,7 +15,6 @@ standalone HTML report without needing the hub.
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 from .config import Config

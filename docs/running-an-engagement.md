@@ -6,8 +6,8 @@ End-to-end walkthrough. Everything runs against the **isolated lab** only.
 
 ```bash
 cp config.example.yaml config.yaml           # set lab network, targets, (optional) DefectDojo
-cp lab/.env.example lab/.env                  # CRM_*_PATH build contexts + throwaway DB creds
-cp lab/target/.env.example lab/target/.env    # runtime env for the CRM services
+cp lab/.env.example lab/.env                  # TARGET_*_PATH build contexts + throwaway DB creds
+cp lab/target/.env.example lab/target/.env    # runtime env for the target services
 ```
 
 Review [`docs/scope.md`](scope.md) and [`docs/rules-of-engagement.md`](rules-of-engagement.md).
@@ -19,7 +19,7 @@ make lab-build        # or: ./redkeep.ps1 lab-build
 make lab-up           # or: ./redkeep.ps1 lab-up
 ```
 
-Only the CRM target services start. The Kali toolbox does **not** start here —
+Only the target services start. The Kali toolbox does **not** start here —
 it runs on demand and exits after each command.
 
 ## Easiest path — the launcher UI
@@ -83,25 +83,25 @@ make down-all         # stop target + hub
 
 ---
 
-## Resource use & gaming
+## Resource use
 
-Redkeep is built so it never quietly eats your laptop's resources:
+Redkeep is built so it never quietly consumes your machine's resources:
 
 - The **Kali toolbox is ephemeral** — it runs one command (`run --rm`) then
   exits. It never idles in the background and has **no restart policy**, so it
   won't come back after a reboot or a Docker restart.
 - **DefectDojo is off by default.** The heavy hub only runs when you explicitly
   `make hub-up`, and you can run full assessments with just the lab up.
-- The CRM **target** services only run while you want them; stop them with
+- The **target** services only run while you want them; stop them with
   `make lab-down`.
 
-Before launching a game, free everything in one shot:
+To free everything in one shot:
 
 ```powershell
-./redkeep.ps1 gaming-safe
+./redkeep.ps1 free-resources
 ```
 
 This stops all Redkeep containers **and** runs `wsl --shutdown`, which releases
 the RAM Docker Desktop's WSL2 backend holds. Quit Docker Desktop too if you want
-it completely idle. (`make gaming-safe` does the stop and reminds you to run
+it completely idle. (`make free-resources` does the stop and reminds you to run
 `wsl --shutdown`.)

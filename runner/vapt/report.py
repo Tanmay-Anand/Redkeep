@@ -7,12 +7,13 @@ live triage UI; this report is the shareable, point-in-time artefact.
 """
 from __future__ import annotations
 
+import base64
 import json
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from defusedxml.ElementTree import parse as _xml_parse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .config import Config
@@ -20,6 +21,20 @@ from .util import log, warn
 
 SEVERITY_ORDER = ["Critical", "High", "Medium", "Low", "Info"]
 TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "reports" / "templates"
+FONT_FILE = Path(__file__).resolve().parents[2] / "resources" / "fonts" / "space-grotesk.woff2"
+
+
+def _font_b64() -> str:
+    """Base64 of the display webfont, inlined so the report is self-contained offline.
+
+    Returns "" if the font is missing; the template then falls back to the system
+    sans stack rather than failing to render.
+    """
+    try:
+        return base64.b64encode(FONT_FILE.read_bytes()).decode("ascii")
+    except OSError:
+        warn("display font not found; report will use the system fallback")
+        return ""
 
 
 @dataclass
@@ -56,10 +71,22 @@ def _text(el, tag, default="") -> str:
     return (child.text or default).strip() if child is not None and child.text else default
 
 
-def _parse_nmap(path: Path, rep: Report) -> None:
+def _xml_root(path: Path):
+    """Parse XML safely and return its root, or None if missing/malformed.
+
+    defusedxml guards against XXE / entity-expansion attacks: tool output can be
+    influenced by a scanned target, so the XML we parse is not fully trusted.
+    """
     try:
-        root = ET.parse(path).getroot()
-    except ET.ParseError:
+        return _xml_parse(path).getroot()
+    except Exception:
+        warn(f"could not parse XML: {path.name}")
+        return None
+
+
+def _parse_nmap(path: Path, rep: Report) -> None:
+    root = _xml_root(path)
+    if root is None:
         return
     for host in root.findall("host"):
         addr = ""
@@ -81,9 +108,8 @@ def _parse_nmap(path: Path, rep: Report) -> None:
 
 
 def _parse_zap(path: Path, rep: Report) -> None:
-    try:
-        root = ET.parse(path).getroot()
-    except ET.ParseError:
+    root = _xml_root(path)
+    if root is None:
         return
     for item in root.iter("alertitem"):
         name = _text(item, "name") or _text(item, "alert")
@@ -127,9 +153,8 @@ def _parse_nuclei(path: Path, rep: Report) -> None:
 
 
 def _parse_nikto(path: Path, rep: Report) -> None:
-    try:
-        root = ET.parse(path).getroot()
-    except ET.ParseError:
+    root = _xml_root(path)
+    if root is None:
         return
     for item in root.iter("item"):
         desc = _text(item, "description") or item.get("id", "nikto item")
@@ -137,9 +162,8 @@ def _parse_nikto(path: Path, rep: Report) -> None:
 
 
 def _parse_junit(path: Path, rep: Report, tool: str) -> None:
-    try:
-        root = ET.parse(path).getroot()
-    except ET.ParseError:
+    root = _xml_root(path)
+    if root is None:
         return
     for case in root.iter("testcase"):
         failure = case.find("failure")
@@ -192,17 +216,26 @@ def build_offline(cfg: Config, run_dir: Path | None = None) -> Path | None:
         loader=FileSystemLoader(str(TEMPLATE_DIR)),
         autoescape=select_autoescape(["html"]),
     )
+    generated = datetime.now().strftime("%Y-%m-%d %H:%M")
+    summ = rep.summary()
     tpl = env.get_template("report.html.j2")
     html = tpl.render(
         product=cfg.defectdojo.get("product_name", "target"),
         engagement=cfg.defectdojo.get("engagement_name", "engagement"),
-        generated=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        generated=generated,
         run_dir=str(run_dir),
-        summary=rep.summary(),
+        summary=summ,
         findings=rep.findings,
         severity_order=SEVERITY_ORDER,
+        font_woff2_b64=_font_b64(),
     )
     out = run_dir / "report.html"
     out.write_text(html, encoding="utf-8")
+
+    # Machine-readable summary the launcher UI reads for its cards/chart/badges.
+    (run_dir / "summary.json").write_text(
+        json.dumps({"generated": generated, "total": sum(summ.values()), "counts": summ}),
+        encoding="utf-8",
+    )
     log(f"offline report -> {out}  ({len(rep.findings)} finding rows)")
     return out

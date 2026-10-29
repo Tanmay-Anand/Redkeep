@@ -1,6 +1,6 @@
 # Lab — the isolated environment
 
-This brings up a **disposable copy of the full builder-crm service set** plus a
+This brings up a **disposable copy of the full example-app service set** plus a
 **Kali toolbox**, all on the private `redkeep-lab` bridge network
 (`172.30.0.0/24`). Target services publish **no host ports** — they are only
 reachable from inside the lab network, which is the isolation boundary.
@@ -8,15 +8,15 @@ reachable from inside the lab network, which is the isolation boundary.
 ## Setup
 
 ```bash
-cp .env.example .env                       # CRM_*_PATH build contexts + throwaway DB creds (parse-time)
-cp target/.env.example target/.env         # runtime env passed into the CRM services
-docker compose build                       # build the CRM services + Kali toolbox
+cp .env.example .env                       # TARGET_*_PATH build contexts + throwaway DB creds (parse-time)
+cp target/.env.example target/.env         # runtime env passed into the target services
+docker compose build                       # build the target services + Kali toolbox
 docker compose up -d                       # start the lab
 ```
 
-The CRM `CRM_*_PATH` values are Docker **build contexts** pointing at the real
-CRM repos. Redkeep only reads them to build images; it never writes to those
-repos.
+The `TARGET_*_PATH` values are Docker **build contexts** pointing at the real
+target-app repos. Redkeep only reads them to build images; it never writes to
+those repos.
 
 ## Running tools
 

@@ -6,43 +6,106 @@
 <title>Redkeep</title>
 <link rel="icon" type="image/svg+xml" href="/resources/redkeep-logo/favicons/favicon.svg">
 <style>
+  @font-face{font-family:'Space Grotesk';font-style:normal;font-weight:300 700;
+    font-display:swap;src:url('/resources/fonts/space-grotesk.woff2') format('woff2')}
   :root{
-    --bg:#18181A; --panel:#1f1f22; --ink:#F2F2F0; --muted:#9aa3b2; --line:#2c2c30;
-    --accent:#b4232a; --ok:#3fae63; --warn:#e0a800;
+    /* Near-black surface set (panels lighter than bg; depth from --line, not shadow). */
+    --bg:#0a0a0b; --panel:#141417; --card:#1a1a1e; --ink:#F2F2F0; --muted:#9aa3b2; --line:#26262b;
+    --accent:#b4232a;          /* keep-red — fills/borders only */
+    --accent-ink:#e2565c;      /* red AS TEXT on dark (AA: 5.0:1) */
+    --ok:#3fae63; --warn:#e0a800;
+    /* Severity scale — shared with the report; the one place colour lives beyond the accent. */
+    --crit:#b4232a; --high:#c0461f; --med:#e0a800; --low:#2f6fa8; --info:#5b636b;
+    --badge-fg:#ffffff; --badge-fg-med:#1b1f27;
+    --term-bg:#000; --term-fg:#d6f5d6; --focus:#F2F2F0;
+    --font-mono:ui-monospace,Menlo,Consolas,monospace;
   }
   @media (prefers-color-scheme: light){
-    :root{ --bg:#FAFAF8; --panel:#fff; --ink:#262626; --muted:#5b6473; --line:#e4e7ec; }
+    :root{ --bg:#FAFAF8; --panel:#fff; --card:#fff; --ink:#262626; --muted:#5b6473; --line:#e4e7ec;
+      --accent-ink:#b4232a; --term-bg:#0b0b0b; --focus:#262626; }
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
     font:15px/1.5 'Space Grotesk',-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:28px 16px}
-  .wrap{max-width:1000px;margin:0 auto}
-  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
+  .wrap{max-width:1040px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
   header img{height:42px}
+  code{background:rgba(127,127,127,.15);padding:1px 5px;border-radius:5px;font-size:12px}
   .pill{font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
-  .pill.ok{color:var(--ok);border-color:var(--ok)} .pill.bad{color:var(--accent);border-color:var(--accent)}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .pill.ok{color:var(--ok);border-color:var(--ok)} .pill.bad{color:var(--accent-ink);border-color:var(--accent)}
+
+  /* --- summary cards ------------------------------------------------------- */
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  @media (max-width:640px){ .summary{grid-template-columns:repeat(2,1fr)} }
+  .mcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .mnum{font-size:26px;font-weight:700;line-height:1.15}
+  .mnum .sub{font-size:14px;color:var(--muted);font-weight:400}
+  .mnum .sep{color:var(--muted);font-weight:400;margin:0 2px}
+  .mlbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+
+  /* --- layout -------------------------------------------------------------- */
+  .grid{display:grid;grid-template-columns:5fr 7fr;gap:16px}
   @media (max-width:760px){ .grid{grid-template-columns:1fr} }
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .panel + .panel{margin-top:16px}
   h2{font-size:14px;margin:0 0 14px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
   label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
   select,button{font:inherit}
   select{width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
   .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-  button{cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  button{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);
     padding:9px 14px;border-radius:9px}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.lead{border-color:var(--ink);font-weight:600}        /* non-accent emphasis */
+  button.primary{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:600}
   button:disabled{opacity:.5;cursor:not-allowed}
   .muted{color:var(--muted);font-size:13px}
-  pre{background:#000;color:#d6f5d6;border-radius:10px;padding:12px;height:280px;overflow:auto;
-    font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;margin:0}
-  .runs a{color:var(--ink);text-decoration:none;display:flex;justify-content:space-between;
-    padding:8px 0;border-bottom:1px solid var(--line)}
-  .runs a:hover{color:var(--accent)}
-  .tag{font-size:11px;color:var(--muted)}
-  .status{font-size:13px;margin-bottom:8px}
+
+  /* --- severity chart ------------------------------------------------------ */
+  .chart svg{width:100%;height:auto;display:block}
+  .chart .empty{color:var(--muted);font-size:13px;padding:22px 0}
+  .bar-crit{fill:var(--crit)} .bar-high{fill:var(--high)} .bar-med{fill:var(--med)}
+  .bar-low{fill:var(--low)} .bar-info{fill:var(--info)}
+  .axis{fill:var(--muted);font-size:7px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:12px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+  .lg-crit{background:var(--crit)} .lg-high{background:var(--high)} .lg-med{background:var(--med)}
+  .lg-low{background:var(--low)} .lg-info{background:var(--info)}
+
+  /* --- live output --------------------------------------------------------- */
+  .ohead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .ohead h2{margin:0}
+  .status{font-size:13px;color:var(--muted)}
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--muted)}
-  .dot.run{background:var(--warn)} .dot.done{background:var(--ok)}
+  .dot.run{background:var(--warn)} .dot.done{background:var(--ok)} .dot.fail{background:var(--accent-ink)}
+  .bar{height:3px;border-radius:999px;background:var(--line);overflow:hidden;margin:0 0 10px}
+  .bar span{display:block;height:100%;width:40%;border-radius:999px;background:var(--warn)}
+  .idlecard{border:1px dashed var(--line);border-radius:10px;padding:16px;color:var(--muted);font-size:13px}
+  pre{background:var(--term-bg);color:var(--term-fg);border-radius:10px;padding:12px;min-height:120px;max-height:360px;
+    overflow:auto;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;margin:0}
+
+  /* --- reports list -------------------------------------------------------- */
+  .runs a{color:var(--ink);text-decoration:none;display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:10px 0;border-bottom:1px solid var(--line)}
+  .runs a:hover{color:var(--accent-ink)}
+  .runs .rname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .runs .counts{display:flex;gap:4px;flex-wrap:wrap;flex:0 0 auto}
+  .tag{font-size:12px;color:var(--muted);white-space:nowrap;flex:0 0 auto}
+  /* Squared mono severity tag — the one component for every severity surface. */
+  .sev{display:inline-block;min-width:46px;text-align:center;padding:3px 8px;border-radius:3px;
+    font:600 11px/1.35 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--badge-fg);white-space:nowrap}
+  .sev-crit{background:var(--crit)} .sev-high{background:var(--high)} .sev-med{background:var(--med);color:var(--badge-fg-med)}
+  .sev-low{background:var(--low)} .sev-info{background:var(--info)}
+  .sev.ct{min-width:0;padding:3px 6px}                                   /* count-tag: tighter */
+  .sev.zero{background:transparent;border:1px solid var(--line);color:var(--muted)}
+
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  @media (prefers-reduced-motion: no-preference){
+    .dot.run{animation:rk-pulse 1.4s ease-in-out infinite}
+    .bar span{animation:rk-indet 1.2s ease-in-out infinite}
+  }
+  @keyframes rk-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  @keyframes rk-indet{0%{margin-left:-40%}100%{margin-left:100%}}
 </style>
 </head>
 <body>
@@ -55,53 +118,84 @@
     <span id="docker" class="pill">checking…</span>
   </header>
 
-  <div class="grid">
-    <div class="panel">
-      <h2>Lab</h2>
-      <p class="muted">Bring the isolated target up before scanning. Nothing idles — the
-         toolbox runs only during a scan.</p>
-      <div class="btns">
-        <button onclick="exec('lab-up')">Start lab</button>
-        <button onclick="exec('lab-down')">Stop lab</button>
-        <button onclick="exec('down-all')">Stop everything</button>
-      </div>
+  <section class="summary">
+    <div class="mcard"><div class="mnum" id="m-docker">—</div><div class="mlbl">Docker</div></div>
+    <div class="mcard"><div class="mnum" id="m-findings">—</div><div class="mlbl">Latest scan findings</div></div>
+    <div class="mcard"><div class="mnum" id="m-crithigh">—</div><div class="mlbl">Latest Critical / High</div></div>
+    <div class="mcard"><div class="mnum" id="m-reports">—</div><div class="mlbl">Reports</div></div>
+  </section>
 
-      <h2 style="margin-top:22px">Run a scan</h2>
-      <label for="domain">Scope</label>
-      <select id="domain">
-        <option value="run">Full engagement (network + web + api)</option>
-        <option value="network">Network only</option>
-        <option value="web">Web only</option>
-        <option value="api">API only</option>
-      </select>
-      <label for="profile">Profile</label>
-      <select id="profile"></select>
-      <div class="btns">
-        <button class="primary" id="scanBtn" onclick="scan()">Start scan</button>
-        <button onclick="exec('report')">Rebuild report</button>
-        <button onclick="stop()">Stop job</button>
+  <div class="grid">
+    <div class="lcol">
+      <div class="panel">
+        <h2>Lab</h2>
+        <p class="muted">Bring the isolated target up before scanning. Nothing idles;
+           the toolbox runs only during a scan.</p>
+        <div class="btns">
+          <button class="lead" onclick="exec('lab-up')">Start lab</button>
+          <button onclick="exec('lab-down')">Stop lab</button>
+          <button onclick="exec('down-all')">Stop everything</button>
+        </div>
+
+        <h2 style="margin-top:22px">Run a scan</h2>
+        <label for="domain">Scope</label>
+        <select id="domain">
+          <option value="run">Full engagement (network + web + api)</option>
+          <option value="network">Network only</option>
+          <option value="web">Web only</option>
+          <option value="api">API only</option>
+        </select>
+        <label for="profile">Profile</label>
+        <select id="profile"></select>
+        <div class="btns">
+          <button class="primary" id="scanBtn" onclick="scan()">Start scan</button>
+          <button onclick="exec('report')">Rebuild report</button>
+          <button onclick="stop()">Stop job</button>
+        </div>
+        <p id="targets" class="muted" style="margin-top:14px"></p>
       </div>
-      <p id="targets" class="muted" style="margin-top:14px"></p>
     </div>
 
-    <div class="panel">
-      <h2>Live output</h2>
-      <div class="status"><span id="dot" class="dot"></span><span id="jobLabel">idle</span></div>
-      <pre id="log">No job yet. Start the lab, then run a scan.</pre>
+    <div class="rcol">
+      <div class="panel">
+        <h2>Findings by severity</h2>
+        <div id="chart" class="chart"><div class="empty">Loading…</div></div>
+        <div class="legend">
+          <span><i class="lg-crit"></i>Critical</span>
+          <span><i class="lg-high"></i>High</span>
+          <span><i class="lg-med"></i>Medium</span>
+          <span><i class="lg-low"></i>Low</span>
+          <span><i class="lg-info"></i>Info</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ohead">
+          <h2>Live output</h2>
+          <span class="status"><span id="dot" class="dot"></span><span id="jobLabel">idle</span></span>
+        </div>
+        <div id="bar" class="bar" hidden><span></span></div>
+        <div id="idlecard" class="idlecard">No job running. Start the lab, then run a scan. Output streams here.</div>
+        <pre id="log" hidden></pre>
+      </div>
     </div>
   </div>
 
-  <div class="panel" style="margin-top:18px">
+  <div class="panel" style="margin-top:16px">
     <h2>Reports</h2>
     <div id="runs" class="runs"><span class="muted">No runs yet.</span></div>
   </div>
 
-  <p class="muted" style="margin-top:20px">Local control panel on 127.0.0.1 only.
-     Close the terminal to stop it. For full isolation before gaming, run
-     <code>./redkeep.ps1 gaming-safe</code>.</p>
+  <p class="muted" style="margin-top:20px">Local control panel, bound to 127.0.0.1
+     only. Nothing is exposed on your network. Nothing idles in the background:
+     stop the launcher (close its window or press Ctrl+C) to shut it down. To stop
+     every container and release the RAM Docker holds, run
+     <code>./redkeep.ps1 free-resources</code>.</p>
 </div>
 
 <script>
+const SEV = ['Critical', 'High', 'Medium', 'Low', 'Info'];
+const CLS = {Critical: 'crit', High: 'high', Medium: 'med', Low: 'low', Info: 'info'};
+
 async function getJSON(u, opts){ const r = await fetch(u, opts); return r.json(); }
 
 async function refreshStatus(){
@@ -110,35 +204,115 @@ async function refreshStatus(){
     const d = document.getElementById('docker');
     d.textContent = s.docker ? 'Docker: running' : 'Docker: not running';
     d.className = 'pill ' + (s.docker ? 'ok' : 'bad');
+
     const sel = document.getElementById('profile');
     if(sel.options.length === 0){
       (s.profiles||[]).forEach(p=>{ const o=document.createElement('option'); o.value=p; o.textContent=p; sel.appendChild(o); });
       sel.value = s.profiles && s.profiles.includes('quick') ? 'quick' : (s.profiles||[])[0];
     }
+
     const t = s.targets||{};
     document.getElementById('targets').textContent = t.configured
-      ? ('Targets — web: ['+(t.web||[]).join(', ')+'] · api: ['+(t.api||[]).join(', ')+']'
-         + (t.defectdojo ? ' · DefectDojo ON' : ''))
-      : 'No config.yaml yet — copy config.example.yaml to config.yaml.';
-    renderRuns(s.runs||[]);
+      ? ('Targets  web: ['+(t.web||[]).join(', ')+']   api: ['+(t.api||[]).join(', ')+']'
+         + (t.defectdojo ? '   DefectDojo ON' : ''))
+      : 'No config.yaml yet. Copy config.example.yaml to config.yaml.';
+
+    const runs = s.runs||[];
+    renderCards(s.docker, runs);
+    renderChart(runs);
+    renderRuns(runs);
   }catch(e){}
+}
+
+function latestScored(runs){ return runs.find(r => r.counts) || null; }
+
+function renderCards(docker, runs){
+  document.getElementById('m-docker').innerHTML =
+    docker ? 'running' : '<span class="sub">not running</span>';
+  const latest = latestScored(runs);
+  document.getElementById('m-findings').textContent = latest ? (latest.total ?? 0) : '—';
+  if(latest){
+    const c = latest.counts || {};
+    document.getElementById('m-crithigh').innerHTML =
+      (c.Critical||0) + '<span class="sep">/</span>' + (c.High||0);
+  }else{
+    document.getElementById('m-crithigh').textContent = '—';
+  }
+  document.getElementById('m-reports').textContent = runs.filter(r => r.report).length || 0;
+}
+
+function shortLabel(name){
+  const p = String(name).split('-');
+  if(p.length >= 2 && /^\d{6}$/.test(p[1])) return p[1].slice(0,2) + ':' + p[1].slice(2,4);
+  return String(name).slice(0, 5);
+}
+
+function renderChart(runs){
+  const el = document.getElementById('chart');
+  const scored = runs.filter(r => r.counts).slice(0, 8).reverse();   // oldest → newest, left → right
+  if(!scored.length){
+    el.innerHTML = '<div class="empty">No scored scans yet. Run a scan to populate this chart.</div>';
+    return;
+  }
+  const totals = scored.map(r => SEV.reduce((s,k)=> s + (r.counts[k]||0), 0));
+  const max = Math.max(1, ...totals);
+  const W = 320, H = 120, padT = 6, padB = 16, plotH = H - padT - padB;
+  const n = scored.length, slot = W / n, bw = Math.min(30, slot * 0.55);
+  let svg = '';
+  scored.forEach((r, i) => {
+    const cx = slot * i + slot / 2;
+    let y = padT + plotH * (1 - totals[i] / max);
+    SEV.forEach(k => {
+      const v = r.counts[k] || 0;
+      if(!v) return;
+      const h = plotH * (v / max);
+      svg += `<rect class="bar-${CLS[k]}" x="${(cx - bw/2).toFixed(1)}" y="${y.toFixed(1)}" `
+           + `width="${bw.toFixed(1)}" height="${h.toFixed(1)}"><title>${k}: ${v}</title></rect>`;
+      y += h;
+    });
+    svg += `<text class="axis" x="${cx.toFixed(1)}" y="${H - 5}" text-anchor="middle">${shortLabel(r.name)}</text>`;
+    if(totals[i] === 0)
+      svg += `<text class="axis" x="${cx.toFixed(1)}" y="${(padT + plotH - 3)}" text-anchor="middle">0</text>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Findings by severity across recent scans">${svg}</svg>`;
+}
+
+function sevBadges(c){
+  const nz = SEV.filter(k => (c[k]||0) > 0);
+  if(!nz.length) return '<span class="sev ct zero">0 findings</span>';
+  return nz.map(k => `<span class="sev ct sev-${CLS[k]}">${k[0]}${c[k]}</span>`).join('');
 }
 
 function renderRuns(runs){
   const el = document.getElementById('runs');
-  if(!runs.length){ el.innerHTML='<span class="muted">No runs yet.</span>'; return; }
-  el.innerHTML = runs.map(r =>
-    `<a href="${r.report ? '/report/'+encodeURIComponent(r.name)+'/report.html' : '#'}" target="_blank">
-       <span>${r.name}</span>
+  if(!runs.length){ el.innerHTML = '<span class="muted">No runs yet.</span>'; return; }
+  el.innerHTML = runs.map(r => {
+    const counts = r.counts ? sevBadges(r.counts) : '';
+    const link = r.report ? '/report/'+encodeURIComponent(r.name)+'/report.html' : '#';
+    return `<a href="${link}" target="_blank">
+       <span class="rname">${r.name}</span>
+       <span class="counts">${counts}</span>
        <span class="tag">${r.report ? 'open report ↗' : 'no report'}</span>
-     </a>`).join('');
+     </a>`;
+  }).join('');
 }
 
-async function exec(action){ await getJSON('/api/exec', {method:'POST', body: JSON.stringify({action})}); pollJob(); }
+function showError(msg){
+  document.getElementById('jobLabel').textContent = '[error] ' + msg;
+  document.getElementById('dot').className = 'dot fail';
+  document.getElementById('bar').hidden = true;
+}
+
+async function exec(action){
+  const r = await getJSON('/api/exec', {method:'POST', body: JSON.stringify({action})});
+  if(r && r.error){ showError(r.error); return; }
+  pollJob();
+}
 async function scan(){
   const domain = document.getElementById('domain').value;
   const profile = document.getElementById('profile').value || 'quick';
-  await getJSON('/api/exec', {method:'POST', body: JSON.stringify({action:'scan', domain, profile})});
+  const r = await getJSON('/api/exec', {method:'POST', body: JSON.stringify({action:'scan', domain, profile})});
+  if(r && r.error){ showError(r.error); return; }
   pollJob();
 }
 async function stop(){ await getJSON('/api/stop', {method:'POST', body:'{}'}); }
@@ -146,12 +320,21 @@ async function stop(){ await getJSON('/api/stop', {method:'POST', body:'{}'}); }
 let polling = null;
 async function pollJob(){
   const j = await getJSON('/api/job');
-  document.getElementById('jobLabel').textContent = j.label ? (j.label+' — '+j.status) : j.status;
-  document.getElementById('dot').className = 'dot ' + (j.status==='running'?'run':(j.status==='done'?'done':''));
+  const running = j.status === 'running';
+  const failed = j.status === 'done' && j.returncode !== 0 && j.returncode !== null;
+  const state = running ? 'run' : (failed ? 'fail' : (j.status === 'done' ? 'done' : ''));
+  const statusText = failed ? ('failed (exit ' + j.returncode + ')') : j.status;
+  document.getElementById('dot').className = 'dot ' + state;
+  document.getElementById('jobLabel').textContent = j.label ? (j.label + ' [' + statusText + ']') : statusText;
+  document.getElementById('bar').hidden = !running;
+
   const log = document.getElementById('log');
-  if(j.log){ log.textContent = j.log; log.scrollTop = log.scrollHeight; }
-  document.getElementById('scanBtn').disabled = (j.status==='running');
-  if(j.status==='running'){ clearTimeout(polling); polling=setTimeout(pollJob, 1500); }
+  const idle = document.getElementById('idlecard');
+  if(j.log){ log.hidden = false; idle.hidden = true; log.textContent = j.log; log.scrollTop = log.scrollHeight; }
+  else { log.hidden = true; idle.hidden = false; }
+
+  document.getElementById('scanBtn').disabled = running;
+  if(running){ clearTimeout(polling); polling = setTimeout(pollJob, 1500); }
   else { refreshStatus(); }
 }
 

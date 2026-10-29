@@ -9,6 +9,18 @@ dependencies = [
     "jinja2>=3.1",
     "rich>=13",
     "schemathesis>=3.33,<4",
+    "defusedxml>=0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "bandit>=1.7",
+    "pip-audit>=2.7",
+    "types-requests",
+    "types-PyYAML",
 ]
 
 [project.scripts]
@@ -21,3 +33,29 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["vapt*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I import-sort, B bugbear, UP pyupgrade.
+select = ["E", "W", "F", "I", "B", "UP"]
+# Line length is advisory here; keep lint focused on correctness, not wrapping.
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+# Third-party scanners (schemathesis, rich, etc.) ship no stubs; don't fail on them.
+ignore_missing_imports = true
+warn_unused_ignores = true
+no_implicit_optional = true
+
+[tool.bandit]
+# Redkeep is a scanner: it shells out to fixed command vectors (no shell=True)
+# and the UI uses a command whitelist. The subprocess checks are intentional.
+skips = ["B404", "B603", "B607"]

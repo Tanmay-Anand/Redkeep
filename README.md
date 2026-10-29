@@ -17,6 +17,20 @@ It is designed to test **your own stack** under explicit authorisation. See
 [`docs/rules-of-engagement.md`](docs/rules-of-engagement.md) and
 [`docs/scope.md`](docs/scope.md) before running anything.
 
+## Screenshots
+
+**Launcher UI** — a dependency-free local control panel (`start-redkeep`): check Docker,
+bring the isolated lab up or down, run a scan (pick scope + profile), watch live output,
+and open past reports. Binds to `127.0.0.1` only and nothing idles in the background.
+
+![Redkeep launcher UI](docs/images/ui-dashboard.png)
+
+**Offline report** — every run writes a standalone, shareable HTML report. Findings are
+consolidated across tools (ZAP, nuclei, Nmap, …) with severity bands and CWE/WASC
+references, aligned to OWASP WSTG / API Security Top 10 / ASVS, PTES and NIST SP 800-115.
+
+![Redkeep VAPT report](docs/images/ui-report.png)
+
 ## Why "isolated lab"
 
 Redkeep **never** points active scanners or exploit modules at production or
@@ -43,8 +57,8 @@ configured lab network is refused before a single packet is sent.
 
 ```bash
 cp config.example.yaml config.yaml          # lab network + targets
-cp lab/.env.example lab/.env                 # CRM build-context paths + throwaway DB creds
-cp lab/target/.env.example lab/target/.env   # runtime env for the CRM services
+cp lab/.env.example lab/.env                 # target build-context paths + throwaway DB creds
+cp lab/target/.env.example lab/target/.env   # runtime env for the target services
 ./start-redkeep.sh                           # or double-click start-redkeep.bat on Windows
 ```
 

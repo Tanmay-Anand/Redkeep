@@ -55,10 +55,21 @@ def _cidr_within(cidr: str, allowed: list[str]) -> bool:
         return False
     for c in allowed:
         try:
-            if net.subnet_of(ipaddress.ip_network(c, strict=False)):
-                return True
+            allowed_net = ipaddress.ip_network(c, strict=False)
         except ValueError:
             continue
+        # subnet_of raises TypeError across IP versions, so compare same-version
+        # networks only (and this keeps the types concrete for the checker).
+        if isinstance(net, ipaddress.IPv4Network) and isinstance(
+            allowed_net, ipaddress.IPv4Network
+        ):
+            if net.subnet_of(allowed_net):
+                return True
+        elif isinstance(net, ipaddress.IPv6Network) and isinstance(
+            allowed_net, ipaddress.IPv6Network
+        ):
+            if net.subnet_of(allowed_net):
+                return True
     return False
 
 
@@ -90,8 +101,8 @@ def assert_allowed(target: str, cfg: Config) -> str:
     except OSError:
         raise TargetNotAllowed(
             f"host {host!r} is not in lab.allowed_hosts and could not be "
-            f"resolved to an allowed IP. Refusing (safety gate)."
-        )
+            "resolved to an allowed IP. Refusing (safety gate)."
+        ) from None
     if _in_allowed_cidr(ip, cfg.allowed_cidrs):
         return host
 

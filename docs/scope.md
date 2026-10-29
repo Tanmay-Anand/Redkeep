@@ -2,15 +2,15 @@
 
 ## Target
 
-A disposable, isolated copy of the **full builder-crm service set**, brought up
+A disposable, isolated copy of the **full example-app service set**, brought up
 on the private lab network by [`lab/docker-compose.yml`](../lab/docker-compose.yml):
 
 | Service            | Lab hostname          | Notes                                  |
 |--------------------|-----------------------|----------------------------------------|
 | API                | `target-api`          | Core REST API                          |
 | Platform           | `target-platform`     | Platform service                       |
-| Post-sales         | `target-post-sales`   | Post-sales service                     |
-| Reports API        | `target-reports-api`  | Reporting service                      |
+| Admin              | `target-admin`        | Admin API                              |
+| Reports            | `target-reports`      | Reporting API                          |
 | UI                 | `target-ui`           | Web front-end                          |
 | Database           | `target-db`           | Seeded with throwaway data (not a scan target by default) |
 
