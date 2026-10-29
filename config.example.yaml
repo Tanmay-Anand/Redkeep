@@ -13,12 +13,12 @@ lab:
   allowed_hosts:
     - "target-api"
     - "target-platform"
-    - "target-post-sales"
-    - "target-reports-api"
+    - "target-admin"
+    - "target-reports"
     - "target-ui"
 
 # --- TARGETS -------------------------------------------------------------------
-# The full set of CRM services under test, addressed on the lab network.
+# The target application's services under test, addressed on the lab network.
 targets:
   web:
     - name: "ui"
@@ -32,18 +32,18 @@ targets:
     - name: "platform"
       base_url: "http://target-platform:8080"
       openapi: "http://target-platform:8080/v3/api-docs"
-    - name: "post-sales"
-      base_url: "http://target-post-sales:8080"
-      openapi: "http://target-post-sales:8080/v3/api-docs"
-    - name: "reports-api"
-      base_url: "http://target-reports-api:8080"
-      openapi: "http://target-reports-api:8080/v3/api-docs"
+    - name: "admin"
+      base_url: "http://target-admin:8080"
+      openapi: "http://target-admin:8080/v3/api-docs"
+    - name: "reports"
+      base_url: "http://target-reports:8080"
+      openapi: "http://target-reports:8080/v3/api-docs"
   network:
     - name: "lab-subnet"
       cidr: "172.30.0.0/24"
 
 # --- AUTH (Phase 4) ------------------------------------------------------------
-# Mechanism to be confirmed from the CRM codebase at Phase 4 (JWT vs session).
+# Mechanism to be confirmed from the target app at Phase 4 (JWT vs session).
 # Fill in once known; leave disabled for unauthenticated passes.
 auth:
   enabled: false
@@ -64,7 +64,7 @@ defectdojo:
   enabled: false
   url: "http://localhost:8081"          # from inside Kali use http://host.docker.internal:8081
   api_token: "CHANGE_ME"                # from DefectDojo: API v2 Key
-  product_name: "builder-crm"
+  product_name: "example-app"
   engagement_name: "redkeep-engagement"
 
 # --- OUTPUT --------------------------------------------------------------------

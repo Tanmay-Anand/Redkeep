@@ -59,7 +59,8 @@ RUN pip3 install --no-cache-dir --break-system-packages \
         "requests>=2.31" \
         "pyyaml>=6" \
         "jinja2>=3.1" \
-        "rich>=13"
+        "rich>=13" \
+        "defusedxml>=0.7"
 
 # Pre-pull nuclei templates and VERIFY they landed. An empty template dir makes
 # nuclei refuse to scan ("no templates provided"), so fail the build loudly

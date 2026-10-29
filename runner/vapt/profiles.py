@@ -13,5 +13,5 @@ def load(name: str) -> dict:
     if not p.exists():
         available = ", ".join(sorted(f.stem for f in PROFILE_DIR.glob("*.yaml")))
         raise FileNotFoundError(f"unknown profile {name!r}. Available: {available}")
-    with open(p, "r", encoding="utf-8") as fh:
+    with open(p, encoding="utf-8") as fh:
         return yaml.safe_load(fh) or {}

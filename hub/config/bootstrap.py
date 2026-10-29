@@ -39,7 +39,7 @@ def get_or_create_product(base, headers, name) -> int:
             return p["id"]
     r = requests.post(f"{base}/products/", headers=headers, timeout=30, json={
         "name": name,
-        "description": "builder-crm — Redkeep VAPT engagement target.",
+        "description": "example-app — Redkeep VAPT engagement target.",
         "prod_type": 1,
     })
     r.raise_for_status()

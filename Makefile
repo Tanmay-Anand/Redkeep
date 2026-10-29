@@ -6,14 +6,14 @@ LAB := docker compose -f lab/docker-compose.yml
 HUB := docker compose -f hub/docker-compose.yml
 PROFILE ?= quick
 
-TARGETS := target-db target-api target-platform target-post-sales target-reports-api target-ui
+TARGETS := target-db target-api target-platform target-admin target-reports target-ui
 
 .PHONY: help lab-build lab-up lab-down lab-reset hub-up hub-down bootstrap \
-        scan network web api report shell down-all gaming-safe
+        scan network web api report shell down-all free-resources
 
 help:
 	@echo "Redkeep targets:"
-	@echo "  make lab-build          build CRM target images + Kali toolbox"
+	@echo "  make lab-build          build target-app images + Kali toolbox"
 	@echo "  make lab-up             start the isolated target (no scanners idling)"
 	@echo "  make lab-down           stop the target"
 	@echo "  make lab-reset          drop + re-seed the target DB"
@@ -24,7 +24,7 @@ help:
 	@echo "  make hub-up|hub-down    start/stop the OPTIONAL DefectDojo hub"
 	@echo "  make bootstrap          create the DefectDojo product/engagement"
 	@echo "  make down-all           stop everything (lab + hub)"
-	@echo "  make gaming-safe        stop everything + remind how to free WSL RAM"
+	@echo "  make free-resources     stop everything + free the RAM Docker's WSL2 backend holds"
 
 lab-build:
 	$(LAB) build
@@ -71,8 +71,8 @@ down-all:
 	-$(LAB) down
 	-$(HUB) down
 
-gaming-safe: down-all
+free-resources: down-all
 	@echo ""
-	@echo "All Redkeep containers stopped. To reclaim RAM from the WSL2 backend"
-	@echo "before gaming, run in PowerShell:   wsl --shutdown"
-	@echo "and quit Docker Desktop. Or just run:   ./redkeep.ps1 gaming-safe"
+	@echo "All Redkeep containers stopped. To reclaim RAM from the WSL2 backend,"
+	@echo "run in PowerShell:   wsl --shutdown"
+	@echo "and quit Docker Desktop. Or just run:   ./redkeep.ps1 free-resources"

@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."   # -> lab/
 
 echo "[redkeep] Stopping target services and removing the DB volume..."
-docker compose stop target-db target-api target-platform target-post-sales target-reports-api target-ui
+docker compose stop target-db target-api target-platform target-admin target-reports target-ui
 docker compose rm -f target-db
 docker volume rm -f redkeep-lab_target-db-data || true
 
@@ -17,6 +17,6 @@ echo "[redkeep] Recreating target (DB will re-run seed SQL)..."
 docker compose up -d target-db
 # Give Postgres a moment to initialise + seed before the apps connect.
 sleep 5
-docker compose up -d target-api target-platform target-post-sales target-reports-api target-ui
+docker compose up -d target-api target-platform target-admin target-reports target-ui
 
 echo "[redkeep] Lab target reset complete."

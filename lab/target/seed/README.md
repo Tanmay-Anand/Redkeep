@@ -13,7 +13,7 @@ Rules:
 Example (`01-redkeep-seed.sql`):
 
 ```sql
--- Example only; adjust to the CRM schema.
+-- Example only; adjust to the target app's schema.
 -- INSERT INTO users (username, password_hash, role)
 -- VALUES ('redkeep-test', '<bcrypt-of-test-password>', 'TESTER');
 ```

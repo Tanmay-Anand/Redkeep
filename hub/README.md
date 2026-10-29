@@ -33,5 +33,5 @@ throwaway lab.
 python hub/config/bootstrap.py --config config.yaml
 ```
 
-This creates the `builder-crm` product and the `redkeep-engagement` engagement
+This creates the `example-app` product and the `redkeep-engagement` engagement
 (idempotent). The runner ingests findings into that engagement.

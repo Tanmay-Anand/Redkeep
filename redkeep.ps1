@@ -3,8 +3,8 @@
 
   Nothing here idles in the background: the Kali toolbox runs with `run --rm`
   (ephemeral) and the optional DefectDojo hub only runs when you start it.
-  The `gaming-safe` command stops everything AND shuts the WSL2 backend down so
-  Docker stops holding RAM before you launch a game.
+  The `free-resources` command stops everything AND shuts the WSL2 backend down
+  so Docker stops holding RAM for the rest of your system.
 
   Usage:
     ./redkeep.ps1 lab-build
@@ -12,7 +12,7 @@
     ./redkeep.ps1 scan [quick|full|network|web|api]
     ./redkeep.ps1 network | web | api | report | shell
     ./redkeep.ps1 hub-up | hub-down | bootstrap
-    ./redkeep.ps1 lab-down | down-all | gaming-safe
+    ./redkeep.ps1 lab-down | down-all | free-resources
 #>
 param(
   [Parameter(Position = 0)][string]$Command = "help",
@@ -22,7 +22,7 @@ param(
 $ErrorActionPreference = "Stop"
 $Lab = @("compose", "-f", "lab/docker-compose.yml")
 $Hub = @("compose", "-f", "hub/docker-compose.yml")
-$Targets = @("target-db", "target-api", "target-platform", "target-post-sales", "target-reports-api", "target-ui")
+$Targets = @("target-db", "target-api", "target-platform", "target-admin", "target-reports", "target-ui")
 
 function Lab { docker @Lab @args }
 function Hub { docker @Hub @args }
@@ -46,13 +46,13 @@ switch ($Command) {
 
   "down-all"  { Lab down; Hub down }
 
-  "gaming-safe" {
+  "free-resources" {
     Write-Host "[redkeep] Stopping all containers..." -ForegroundColor Cyan
     try { Lab down } catch {}
     try { Hub down } catch {}
     Write-Host "[redkeep] Shutting down the WSL2 backend to free RAM..." -ForegroundColor Cyan
     try { wsl --shutdown } catch { Write-Host "wsl --shutdown failed (is WSL installed?)" -ForegroundColor Yellow }
-    Write-Host "[redkeep] Done. Also quit Docker Desktop if you want it fully idle. Game on." -ForegroundColor Green
+    Write-Host "[redkeep] Done. Also quit Docker Desktop if you want it fully idle." -ForegroundColor Green
   }
 
   default {
@@ -60,6 +60,6 @@ switch ($Command) {
     Write-Host "  lab-build  lab-up  lab-down  lab-reset"
     Write-Host "  scan [quick|full|network|web|api]   network  web  api  report  shell"
     Write-Host "  hub-up  hub-down  bootstrap"
-    Write-Host "  down-all   gaming-safe   (gaming-safe also runs 'wsl --shutdown')"
+    Write-Host "  down-all   free-resources   (free-resources also runs 'wsl --shutdown')"
   }
 }

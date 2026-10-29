@@ -1,0 +1,23 @@
+# Keeps dependencies and pinned actions current. The github-actions updates also
+# let us move the tag-pinned actions to commit SHAs over time (supply-chain
+# hardening) without hand-maintaining them.
+version: 2
+updates:
+  # Python runner dependencies (PEP 621 pyproject).
+  - package-ecosystem: "pip"
+    directory: "/runner"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # GitHub Actions used by the workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Base image of the Kali toolbox.
+  - package-ecosystem: "docker"
+    directory: "/lab/kali"
+    schedule:
+      interval: "weekly"
