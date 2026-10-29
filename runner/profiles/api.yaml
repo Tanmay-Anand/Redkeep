@@ -1,0 +1,4 @@
+# API-only convenience profile.
+api:
+  schemathesis: true
+  zap_api: true

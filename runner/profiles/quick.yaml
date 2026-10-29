@@ -1,0 +1,12 @@
+# Quick pass — fast, light-touch. Good for a smoke check between changes.
+network:
+  nmap_args: ["-sV", "-T4", "--top-ports", "100"]
+  metasploit: false
+web:
+  zap:
+    mode: baseline      # passive only, no active attacks
+  nuclei: true
+  nikto: false
+api:
+  schemathesis: true
+  zap_api: false

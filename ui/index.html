@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redkeep</title>
+<link rel="icon" type="image/svg+xml" href="/resources/redkeep-logo/favicons/favicon.svg">
+<style>
+  :root{
+    --bg:#18181A; --panel:#1f1f22; --ink:#F2F2F0; --muted:#9aa3b2; --line:#2c2c30;
+    --accent:#b4232a; --ok:#3fae63; --warn:#e0a800;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#FAFAF8; --panel:#fff; --ink:#262626; --muted:#5b6473; --line:#e4e7ec; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 'Space Grotesk',-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:28px 16px}
+  .wrap{max-width:1000px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
+  header img{height:42px}
+  .pill{font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .pill.ok{color:var(--ok);border-color:var(--ok)} .pill.bad{color:var(--accent);border-color:var(--accent)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:760px){ .grid{grid-template-columns:1fr} }
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  h2{font-size:14px;margin:0 0 14px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  select,button{font:inherit}
+  select{width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  button{cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--ink);
+    padding:9px 14px;border-radius:9px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .muted{color:var(--muted);font-size:13px}
+  pre{background:#000;color:#d6f5d6;border-radius:10px;padding:12px;height:280px;overflow:auto;
+    font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;margin:0}
+  .runs a{color:var(--ink);text-decoration:none;display:flex;justify-content:space-between;
+    padding:8px 0;border-bottom:1px solid var(--line)}
+  .runs a:hover{color:var(--accent)}
+  .tag{font-size:11px;color:var(--muted)}
+  .status{font-size:13px;margin-bottom:8px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--muted)}
+  .dot.run{background:var(--warn)} .dot.done{background:var(--ok)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <picture>
+      <source media="(prefers-color-scheme: light)" srcset="/resources/redkeep-logo/svg/redkeep-lockup-dark.svg">
+      <img src="/resources/redkeep-logo/svg/redkeep-lockup-light.svg" alt="Redkeep">
+    </picture>
+    <span id="docker" class="pill">checking…</span>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Lab</h2>
+      <p class="muted">Bring the isolated target up before scanning. Nothing idles — the
+         toolbox runs only during a scan.</p>
+      <div class="btns">
+        <button onclick="exec('lab-up')">Start lab</button>
+        <button onclick="exec('lab-down')">Stop lab</button>
+        <button onclick="exec('down-all')">Stop everything</button>
+      </div>
+
+      <h2 style="margin-top:22px">Run a scan</h2>
+      <label for="domain">Scope</label>
+      <select id="domain">
+        <option value="run">Full engagement (network + web + api)</option>
+        <option value="network">Network only</option>
+        <option value="web">Web only</option>
+        <option value="api">API only</option>
+      </select>
+      <label for="profile">Profile</label>
+      <select id="profile"></select>
+      <div class="btns">
+        <button class="primary" id="scanBtn" onclick="scan()">Start scan</button>
+        <button onclick="exec('report')">Rebuild report</button>
+        <button onclick="stop()">Stop job</button>
+      </div>
+      <p id="targets" class="muted" style="margin-top:14px"></p>
+    </div>
+
+    <div class="panel">
+      <h2>Live output</h2>
+      <div class="status"><span id="dot" class="dot"></span><span id="jobLabel">idle</span></div>
+      <pre id="log">No job yet. Start the lab, then run a scan.</pre>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:18px">
+    <h2>Reports</h2>
+    <div id="runs" class="runs"><span class="muted">No runs yet.</span></div>
+  </div>
+
+  <p class="muted" style="margin-top:20px">Local control panel on 127.0.0.1 only.
+     Close the terminal to stop it. For full isolation before gaming, run
+     <code>./redkeep.ps1 gaming-safe</code>.</p>
+</div>
+
+<script>
+async function getJSON(u, opts){ const r = await fetch(u, opts); return r.json(); }
+
+async function refreshStatus(){
+  try{
+    const s = await getJSON('/api/status');
+    const d = document.getElementById('docker');
+    d.textContent = s.docker ? 'Docker: running' : 'Docker: not running';
+    d.className = 'pill ' + (s.docker ? 'ok' : 'bad');
+    const sel = document.getElementById('profile');
+    if(sel.options.length === 0){
+      (s.profiles||[]).forEach(p=>{ const o=document.createElement('option'); o.value=p; o.textContent=p; sel.appendChild(o); });
+      sel.value = s.profiles && s.profiles.includes('quick') ? 'quick' : (s.profiles||[])[0];
+    }
+    const t = s.targets||{};
+    document.getElementById('targets').textContent = t.configured
+      ? ('Targets — web: ['+(t.web||[]).join(', ')+'] · api: ['+(t.api||[]).join(', ')+']'
+         + (t.defectdojo ? ' · DefectDojo ON' : ''))
+      : 'No config.yaml yet — copy config.example.yaml to config.yaml.';
+    renderRuns(s.runs||[]);
+  }catch(e){}
+}
+
+function renderRuns(runs){
+  const el = document.getElementById('runs');
+  if(!runs.length){ el.innerHTML='<span class="muted">No runs yet.</span>'; return; }
+  el.innerHTML = runs.map(r =>
+    `<a href="${r.report ? '/report/'+encodeURIComponent(r.name)+'/report.html' : '#'}" target="_blank">
+       <span>${r.name}</span>
+       <span class="tag">${r.report ? 'open report ↗' : 'no report'}</span>
+     </a>`).join('');
+}
+
+async function exec(action){ await getJSON('/api/exec', {method:'POST', body: JSON.stringify({action})}); pollJob(); }
+async function scan(){
+  const domain = document.getElementById('domain').value;
+  const profile = document.getElementById('profile').value || 'quick';
+  await getJSON('/api/exec', {method:'POST', body: JSON.stringify({action:'scan', domain, profile})});
+  pollJob();
+}
+async function stop(){ await getJSON('/api/stop', {method:'POST', body:'{}'}); }
+
+let polling = null;
+async function pollJob(){
+  const j = await getJSON('/api/job');
+  document.getElementById('jobLabel').textContent = j.label ? (j.label+' — '+j.status) : j.status;
+  document.getElementById('dot').className = 'dot ' + (j.status==='running'?'run':(j.status==='done'?'done':''));
+  const log = document.getElementById('log');
+  if(j.log){ log.textContent = j.log; log.scrollTop = log.scrollHeight; }
+  document.getElementById('scanBtn').disabled = (j.status==='running');
+  if(j.status==='running'){ clearTimeout(polling); polling=setTimeout(pollJob, 1500); }
+  else { refreshStatus(); }
+}
+
+refreshStatus();
+pollJob();
+setInterval(refreshStatus, 15000);
+</script>
+</body>
+</html>

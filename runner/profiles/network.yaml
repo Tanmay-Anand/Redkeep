@@ -1,0 +1,4 @@
+# Network-only convenience profile.
+network:
+  nmap_args: ["-sV", "-sC", "-p-", "-T4"]
+  metasploit: true

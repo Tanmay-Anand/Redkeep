@@ -1,0 +1,34 @@
+# Lab-only CI: validates the runner and the compose files. It NEVER runs a scan
+# or brings up a target — there is no authorised target in CI.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  runner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install runner
+        run: pip install ./runner
+      - name: Byte-compile
+        run: python -m compileall runner/vapt
+      - name: CLI smoke
+        run: vapt --help
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate lab compose
+        run: |
+          cp lab/.env.example lab/.env
+          cp lab/target/.env.example lab/target/.env
+          docker compose -f lab/docker-compose.yml config >/dev/null
+      - name: Validate hub compose
+        run: docker compose -f hub/docker-compose.yml config >/dev/null

@@ -1,0 +1,29 @@
+# Local config (contains lab network + DefectDojo credentials)
+config.yaml
+.env
+lab/.env
+lab/target/.env
+
+# Generated scan output and reports — never commit engagement artefacts
+reports/output/
+runner/output/
+*.scan.xml
+*.scan.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Tool caches
+.zap/
+.nuclei/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,12 @@
+# Full pass — thorough. Use for a complete engagement against the lab target.
+network:
+  nmap_args: ["-sV", "-sC", "-p-", "-T4"]
+  metasploit: true      # auxiliary/scanner modules only
+web:
+  zap:
+    mode: full          # spider + passive + active scan
+  nuclei: true
+  nikto: true
+api:
+  schemathesis: true
+  zap_api: true

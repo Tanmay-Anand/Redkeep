@@ -1,0 +1,109 @@
+# Redkeep isolated lab.
+#
+# Brings up a DISPOSABLE copy of the full builder-crm service set plus a Kali
+# toolbox, all on a private bridge network (redkeep-lab). The target services
+# publish NO host ports — they are reachable only from inside the lab network
+# (i.e. from the Kali toolbox and the runner). This is the isolation boundary.
+#
+# The CRM services are built from the real repos via build-context paths set in
+# lab/target/.env (copy lab/target/.env.example). Redkeep never edits those
+# repos; it only references them read-only as build contexts.
+#
+# DefectDojo (the findings hub) runs from hub/docker-compose.yml and is reached
+# by the runner over host.docker.internal / localhost — see hub/README.md.
+
+name: redkeep-lab
+
+networks:
+  redkeep-lab:
+    name: redkeep-lab
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  target-db-data:
+
+services:
+  target-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-crm}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-throwaway-lab-only}
+      POSTGRES_DB: ${DB_NAME:-crm}
+    volumes:
+      - target-db-data:/var/lib/postgresql/data
+      - ./target/seed:/docker-entrypoint-initdb.d:ro
+    networks:
+      redkeep-lab:
+        aliases: [target-db]
+    # No published ports: DB is reachable only inside the lab network.
+
+  target-api:
+    build:
+      context: ${CRM_API_PATH:?set CRM_API_PATH in lab/target/.env}
+    env_file:
+      - ./target/.env
+    depends_on: [target-db]
+    networks:
+      redkeep-lab:
+        aliases: [target-api]
+
+  target-platform:
+    build:
+      context: ${CRM_PLATFORM_PATH:?set CRM_PLATFORM_PATH in lab/target/.env}
+    env_file:
+      - ./target/.env
+    depends_on: [target-db]
+    networks:
+      redkeep-lab:
+        aliases: [target-platform]
+
+  target-post-sales:
+    build:
+      context: ${CRM_POST_SALES_PATH:?set CRM_POST_SALES_PATH in lab/target/.env}
+    env_file:
+      - ./target/.env
+    depends_on: [target-db]
+    networks:
+      redkeep-lab:
+        aliases: [target-post-sales]
+
+  target-reports-api:
+    build:
+      context: ${CRM_REPORTS_API_PATH:?set CRM_REPORTS_API_PATH in lab/target/.env}
+    env_file:
+      - ./target/.env
+    depends_on: [target-db]
+    networks:
+      redkeep-lab:
+        aliases: [target-reports-api]
+
+  target-ui:
+    build:
+      context: ${CRM_UI_PATH:?set CRM_UI_PATH in lab/target/.env}
+    env_file:
+      - ./target/.env
+    depends_on: [target-api]
+    networks:
+      redkeep-lab:
+        aliases: [target-ui]
+
+  kali:
+    build:
+      context: ./kali
+    image: redkeep/kali-toolbox:latest
+    # EPHEMERAL ON PURPOSE. The toolbox does NOT idle in the background. It is
+    # behind the "tools" profile so `docker compose up` never starts it, and the
+    # Makefile runs it as `docker compose run --rm kali ...` — it exists only for
+    # the duration of one scan, then exits and is removed. No restart policy, so
+    # it never comes back on its own after a reboot or when Docker restarts.
+    profiles: ["tools"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach optional DefectDojo on the host
+    volumes:
+      - ../:/redkeep:rw          # the whole repo, so the runner + config are present
+    working_dir: /redkeep
+    networks:
+      - redkeep-lab

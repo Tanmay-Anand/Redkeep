@@ -1,0 +1,71 @@
+# Redkeep configuration — copy to config.yaml and edit.
+# config.yaml is gitignored because it holds the lab network and DefectDojo creds.
+
+# --- SAFETY GATE ---------------------------------------------------------------
+# The ONLY networks/hosts the runner is allowed to scan. Anything resolving
+# outside these is refused before any tool runs. Keep this to the lab network
+# only. Never add a production or staging address here.
+lab:
+  # CIDR(s) of the private Docker lab network (see lab/docker-compose.yml).
+  allowed_cidrs:
+    - "172.30.0.0/24"
+  # Hostnames the runner may resolve (must resolve INTO an allowed CIDR).
+  allowed_hosts:
+    - "target-api"
+    - "target-platform"
+    - "target-post-sales"
+    - "target-reports-api"
+    - "target-ui"
+
+# --- TARGETS -------------------------------------------------------------------
+# The full set of CRM services under test, addressed on the lab network.
+targets:
+  web:
+    - name: "ui"
+      url: "http://target-ui:8080"
+    - name: "api"
+      url: "http://target-api:8080"
+  api:
+    - name: "api"
+      base_url: "http://target-api:8080"
+      openapi: "http://target-api:8080/v3/api-docs"   # confirm path at Phase 4
+    - name: "platform"
+      base_url: "http://target-platform:8080"
+      openapi: "http://target-platform:8080/v3/api-docs"
+    - name: "post-sales"
+      base_url: "http://target-post-sales:8080"
+      openapi: "http://target-post-sales:8080/v3/api-docs"
+    - name: "reports-api"
+      base_url: "http://target-reports-api:8080"
+      openapi: "http://target-reports-api:8080/v3/api-docs"
+  network:
+    - name: "lab-subnet"
+      cidr: "172.30.0.0/24"
+
+# --- AUTH (Phase 4) ------------------------------------------------------------
+# Mechanism to be confirmed from the CRM codebase at Phase 4 (JWT vs session).
+# Fill in once known; leave disabled for unauthenticated passes.
+auth:
+  enabled: false
+  type: "bearer"            # "bearer" | "cookie"
+  # For bearer: a login call whose JSON response yields the token.
+  login_url: "http://target-api:8080/auth/login"
+  login_body: { "username": "redkeep-test", "password": "change-me" }
+  token_json_path: "data.token"
+  header_name: "Authorization"
+  header_prefix: "Bearer "
+
+# --- DEFECTDOJO (the hub) — OPTIONAL -------------------------------------------
+# DefectDojo is a heavy multi-container stack. It is OFF by default so nothing
+# heavy runs unless you want cross-run finding tracking. With it disabled,
+# scans still write raw output and `vapt report` builds an offline HTML report
+# with only the lab up. Set enabled: true AND bring up hub/ to use it.
+defectdojo:
+  enabled: false
+  url: "http://localhost:8081"          # from inside Kali use http://host.docker.internal:8081
+  api_token: "CHANGE_ME"                # from DefectDojo: API v2 Key
+  product_name: "builder-crm"
+  engagement_name: "redkeep-engagement"
+
+# --- OUTPUT --------------------------------------------------------------------
+output_dir: "reports/output"

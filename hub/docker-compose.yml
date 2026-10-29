@@ -1,0 +1,68 @@
+# Redkeep findings hub — DefectDojo.
+#
+# This mirrors the upstream DefectDojo docker-compose topology using the
+# published images. Upstream (github.com/DefectDojo/django-DefectDojo) is the
+# authoritative source; if these images/envs drift, prefer upstream's compose
+# and just keep the host port (8081) and admin token wired into config.yaml.
+#
+# Brings DefectDojo up on http://localhost:8081. The runner ingests findings
+# here via the API v2 token (see hub/config/bootstrap.py).
+
+name: redkeep-hub
+
+volumes:
+  ddojo-postgres:
+  ddojo-media:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: defectdojo
+      POSTGRES_USER: defectdojo
+      POSTGRES_PASSWORD: ${DD_DB_PASSWORD:-defectdojo}
+    volumes:
+      - ddojo-postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+
+  initializer:
+    image: defectdojo/defectdojo-django:latest
+    entrypoint: ["/entrypoint-initializer.sh"]
+    environment: &dd-env
+      DD_DATABASE_URL: postgresql://defectdojo:${DD_DB_PASSWORD:-defectdojo}@postgres:5432/defectdojo
+      DD_CELERY_BROKER_URL: redis://redis:6379/0
+      DD_SECRET_KEY: ${DD_SECRET_KEY:-change-me-redkeep-lab-only}
+      DD_ADMIN_USER: ${DD_ADMIN_USER:-admin}
+      DD_ADMIN_PASSWORD: ${DD_ADMIN_PASSWORD:-redkeep-admin}
+      DD_ALLOWED_HOSTS: "*"
+    depends_on: [postgres, redis]
+
+  uwsgi:
+    image: defectdojo/defectdojo-django:latest
+    entrypoint: ["/entrypoint-uwsgi.sh"]
+    environment: *dd-env
+    depends_on: [postgres, redis, initializer]
+
+  celerybeat:
+    image: defectdojo/defectdojo-django:latest
+    entrypoint: ["/entrypoint-celery-beat.sh"]
+    environment: *dd-env
+    depends_on: [postgres, redis]
+
+  celeryworker:
+    image: defectdojo/defectdojo-django:latest
+    entrypoint: ["/entrypoint-celery-worker.sh"]
+    environment: *dd-env
+    depends_on: [postgres, redis]
+    volumes:
+      - ddojo-media:/app/media
+
+  nginx:
+    image: defectdojo/defectdojo-nginx:latest
+    environment:
+      DD_UWSGI_HOST: uwsgi
+    depends_on: [uwsgi]
+    ports:
+      - "8081:8080"       # DefectDojo UI/API at http://localhost:8081

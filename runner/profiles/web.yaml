@@ -1,0 +1,6 @@
+# Web-only convenience profile.
+web:
+  zap:
+    mode: full
+  nuclei: true
+  nikto: true
