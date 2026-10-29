@@ -13,6 +13,7 @@ only do the lab/scan actions defined below.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import subprocess
 import threading
@@ -96,10 +97,8 @@ def _terminate_running(timeout: float = 8.0) -> None:
     with _lock:
         proc = _job.get("proc")
     if proc is not None:
-        try:
+        with contextlib.suppress(Exception):
             proc.terminate()
-        except Exception:
-            pass
     deadline = time.time() + timeout
     while time.time() < deadline:
         with _lock:

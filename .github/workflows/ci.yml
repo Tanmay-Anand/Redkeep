@@ -36,9 +36,9 @@ jobs:
       - name: Install runner + dev tools
         run: pip install "./runner[dev]"
       - name: Ruff lint
-        run: ruff check runner/vapt ui
+        run: ruff check --config runner/pyproject.toml runner/vapt ui
       - name: Mypy (runner)
-        run: mypy runner/vapt
+        run: mypy --config-file runner/pyproject.toml runner/vapt
       - name: Byte-compile
         run: python -m compileall runner/vapt ui
       - name: Pytest (safety gate + runner)
