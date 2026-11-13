@@ -131,6 +131,26 @@ def _docker_ok() -> bool:
         return False
 
 
+def _lab_state() -> dict:
+    """Which lab target services are running, from a read-only `docker compose ps`.
+
+    ``state`` is "up" (all targets), "partial" (some), "down" (none) or "unknown" (the
+    query failed). The toolbox's one-off scan containers are not lab targets, so they
+    are ignored; so is anything started outside this compose project.
+    """
+    unknown = {"state": "unknown", "running": [], "total": len(TARGETS)}
+    try:
+        r = subprocess.run(LAB + ["ps", "--services", "--status", "running"],
+                           cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=10)
+    except Exception:
+        return unknown
+    if r.returncode != 0:
+        return unknown
+    up = sorted(set(r.stdout.split()) & set(TARGETS))
+    state = "up" if len(up) == len(TARGETS) else ("partial" if up else "down")
+    return {"state": state, "running": up, "total": len(TARGETS)}
+
+
 def _profiles() -> list[str]:
     d = REPO_ROOT / "runner" / "profiles"
     return sorted(p.stem for p in d.glob("*.yaml")) if d.exists() else []
@@ -179,13 +199,50 @@ def _job_view() -> dict:
     log = ""
     if j.get("logfile") and Path(j["logfile"]).exists():
         log = Path(j["logfile"]).read_text(encoding="utf-8", errors="replace")[-8000:]
-    return {"status": j["status"], "label": j["label"],
+    return {"status": j["status"], "label": j["label"], "started": j["started"],
             "returncode": j["returncode"], "log": log}
+
+
+MAX_BODY = 64 * 1024  # the UI's requests are a few bytes; refuse anything large
+
+
+def _local_authorities(port: int) -> set[str]:
+    """The only ``host:port`` values a request to this loopback server may name."""
+    return {f"127.0.0.1:{port}", f"localhost:{port}"}
 
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):  # quiet
         pass
+
+    # ---- request guards ------------------------------------------------------------
+    # The server binds to 127.0.0.1, but a web page open in the user's browser can still
+    # reach it: by DNS rebinding (an attacker's hostname resolving to 127.0.0.1) or by a
+    # "simple" cross-site POST, which browsers send without a CORS preflight. So:
+    #   * every request must name this server in its Host header (stops rebinding);
+    #   * a state-changing POST must come from this page's own origin, not be marked
+    #     cross-site by the browser, and carry Content-Type: application/json, a type a
+    #     cross-site form or no-cors fetch cannot send without a preflight we never answer.
+    # Requests without Origin / Sec-Fetch-Site (curl, scripts on this machine) still work.
+
+    def _port(self) -> int:
+        return int(self.server.server_address[1])
+
+    def _host_ok(self) -> bool:
+        return (self.headers.get("Host") or "").strip().lower() in _local_authorities(self._port())
+
+    def _post_refusal(self) -> str | None:
+        """Why this POST is refused, or None when it is allowed."""
+        origin = self.headers.get("Origin")
+        if origin is not None and origin.strip().lower() not in {
+                f"http://{a}" for a in _local_authorities(self._port())}:
+            return "cross-origin request refused"
+        if (self.headers.get("Sec-Fetch-Site") or "same-origin").lower() not in ("same-origin", "none"):
+            return "cross-site request refused"
+        ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        if ctype != "application/json":
+            return "Content-Type must be application/json"
+        return None
 
     def _send(self, code, body, ctype="application/json"):
         if isinstance(body, (dict, list)):
@@ -204,11 +261,16 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, path.read_bytes(), ctype)
 
     def do_GET(self):
+        if not self._host_ok():
+            return self._send(403, {"error": "unexpected Host header"})
         p = urlparse(self.path).path
         if p == "/" or p == "/index.html":
             return self._serve_file(UI_DIR / "index.html", "text/html; charset=utf-8")
         if p == "/api/status":
-            return self._send(200, {"docker": _docker_ok(), "profiles": _profiles(),
+            docker = _docker_ok()
+            lab = _lab_state() if docker else {"state": "unknown", "running": [],
+                                                "total": len(TARGETS)}
+            return self._send(200, {"docker": docker, "lab": lab, "profiles": _profiles(),
                                     "targets": _targets(), "runs": _runs()})
         if p == "/api/job":
             return self._send(200, _job_view())
@@ -228,8 +290,18 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):
+        if not self._host_ok():
+            return self._send(403, {"error": "unexpected Host header"})
+        refusal = self._post_refusal()
+        if refusal:
+            return self._send(403, {"error": refusal})
         p = urlparse(self.path).path
-        length = int(self.headers.get("Content-Length", 0) or 0)
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+        except ValueError:
+            return self._send(400, {"error": "bad Content-Length"})
+        if length > MAX_BODY:
+            return self._send(413, {"error": "request too large"})
         try:
             body = json.loads(self.rfile.read(length) or b"{}")
         except json.JSONDecodeError:

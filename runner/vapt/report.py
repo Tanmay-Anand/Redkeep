@@ -21,20 +21,33 @@ from .util import log, warn
 
 SEVERITY_ORDER = ["Critical", "High", "Medium", "Low", "Info"]
 TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "reports" / "templates"
-FONT_FILE = Path(__file__).resolve().parents[2] / "resources" / "fonts" / "space-grotesk.woff2"
+FONT_DIR = Path(__file__).resolve().parents[2] / "resources" / "fonts"
+FONT_FILE = FONT_DIR / "inter.woff2"
+# JetBrains Mono (latin subset, SIL OFL 1.1) — the report's "machine" voice.
+MONO_WEIGHTS = (400, 500, 700)
 
 
-def _font_b64() -> str:
-    """Base64 of the display webfont, inlined so the report is self-contained offline.
+def _font_b64(path: Path = FONT_FILE) -> str:
+    """Base64 of a webfont, inlined so the report is self-contained offline.
 
     Returns "" if the font is missing; the template then falls back to the system
-    sans stack rather than failing to render.
+    font stack rather than failing to render.
     """
     try:
-        return base64.b64encode(FONT_FILE.read_bytes()).decode("ascii")
+        return base64.b64encode(path.read_bytes()).decode("ascii")
     except OSError:
-        warn("display font not found; report will use the system fallback")
+        warn(f"font {path.name} not found; report will use the system fallback")
         return ""
+
+
+def _mono_fonts_b64() -> dict[int, str]:
+    """Base64 of each embedded JetBrains Mono weight, keyed by weight; missing ones are skipped."""
+    out: dict[int, str] = {}
+    for w in MONO_WEIGHTS:
+        b64 = _font_b64(FONT_DIR / f"jetbrains-mono-{w}.woff2")
+        if b64:
+            out[w] = b64
+    return out
 
 
 @dataclass
@@ -228,6 +241,7 @@ def build_offline(cfg: Config, run_dir: Path | None = None) -> Path | None:
         findings=rep.findings,
         severity_order=SEVERITY_ORDER,
         font_woff2_b64=_font_b64(),
+        mono_fonts_b64=_mono_fonts_b64(),
     )
     out = run_dir / "report.html"
     out.write_text(html, encoding="utf-8")

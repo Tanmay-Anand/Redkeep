@@ -41,8 +41,8 @@ jobs:
         run: mypy --config-file runner/pyproject.toml runner/vapt
       - name: Byte-compile
         run: python -m compileall runner/vapt ui
-      - name: Pytest (safety gate + runner)
-        run: pytest runner/tests
+      - name: Pytest (safety gate + runner + launcher guards)
+        run: pytest runner/tests ui/tests
       - name: CLI smoke
         run: vapt --help
 
