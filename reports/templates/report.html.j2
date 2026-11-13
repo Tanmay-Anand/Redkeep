@@ -7,92 +7,166 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii03LjAgLTQuMCA5NiA5NiI+PHN0eWxlPnBhdGh7c3Ryb2tlOiMyNjI2MjZ9QG1lZGlhIChwcmVmZXJzLWNvbG9yLXNjaGVtZTogZGFyayl7cGF0aHtzdHJva2U6I0YyRjJGMH19PC9zdHlsZT48cGF0aCBkPSJNNSA4MyBWNSBIMTUgVjE5IEgzNiBWNSBINDYgVjE5IEg2NyBWNSBINzcgVjgzIEg1NiBWNjAgQTE1IDE1IDAgMCAwIDI2IDYwIFY4MyBaIiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWpvaW49Im1pdGVyIi8+PC9zdmc+">
 <style>
   {% if font_woff2_b64 %}
-  @font-face{font-family:'Space Grotesk';font-style:normal;font-weight:300 700;
+  @font-face{font-family:'Inter';font-style:normal;font-weight:100 900;
     font-display:swap;src:url(data:font/woff2;base64,{{ font_woff2_b64 }}) format('woff2')}
   {% endif %}
+  {% for w, b64 in (mono_fonts_b64 or {}).items() %}
+  @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:{{ w }};
+    font-display:swap;src:url(data:font/woff2;base64,{{ b64 }}) format('woff2')}
+  {% endfor %}
   :root{
-    /* Surface tokens — shared with the launcher UI (ui/index.html). Near-black. */
-    --bg:#0a0a0b; --panel:#141417; --card:#1a1a1e; --ink:#F2F2F0; --muted:#9aa3b2; --line:#26262b;
-    /* Severity scale (CVSS v3.1 bands); every tag text pair is >=4.5:1 (WCAG AA). */
-    --crit:#b4232a; --high:#c0461f; --med:#e0a800; --low:#2f6fa8; --info:#5b636b;
-    --badge-fg:#ffffff; --badge-fg-med:#1b1f27;
-    --font-mono:ui-monospace,Menlo,Consolas,monospace;
-  }
-  @media (prefers-color-scheme: light){
-    :root{ --bg:#FAFAF8; --panel:#fff; --ink:#262626; --muted:#5b6473; --line:#e4e7ec; }
+    /* Light surface tokens — shared with the launcher (Keep). Light only; the keep's dark
+       tokens are not used here: the report has no live output. */
+    color-scheme:light;
+    --bg:#f6f6f5; --panel:#ffffff; --card:#fbfbfa; --ink:#111113; --muted:#60636b;
+    --line:#e2e2de; --line2:#eeeeeb; --soft:#b9bbc1;
+    --hatch:repeating-linear-gradient(135deg, rgba(17,17,19,.14) 0 1px, transparent 1px 6px);
+    /* Severity scale (CVSS v3.1 bands). */
+    --crit:#b4232a; --high:#c0461f; --med:#d99400; --low:#2f6fa8; --info:#6b7280;
+    --font-sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Consolas,monospace;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font:15px/1.5 'Space Grotesk',-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:32px 16px}
+  [hidden]{display:none!important}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:14.5px/1.55 var(--font-sans);padding:44px 20px 70px;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
   .wrap{max-width:980px;margin:0 auto}
-  h1{font-size:22px;margin:0 0 4px}
-  .sub{color:var(--muted);margin:0 0 24px;font-size:13px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:20px}
-  .cards{display:flex;gap:10px;flex-wrap:wrap}
-  .card{flex:1;min-width:120px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center}
-  .card .n{font-size:26px;font-weight:700}
-  .card .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
-  /* Squared mono severity tag — the one component for every severity surface. */
-  .sev{display:inline-block;min-width:46px;text-align:center;padding:3px 8px;border-radius:3px;
-    font:600 11px/1.35 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--badge-fg);white-space:nowrap}
-  .sev-crit{background:var(--crit)} .sev-high{background:var(--high)} .sev-med{background:var(--med);color:var(--badge-fg-med)}
-  .sev-low{background:var(--low)} .sev-info{background:var(--info)}
-  .tool{font-size:12px;color:var(--muted)}
-  code{background:rgba(127,127,127,.15);padding:1px 5px;border-radius:5px;font-size:12px}
-  footer{color:var(--muted);font-size:12px;margin-top:28px;line-height:1.7}
+
+  /* Two voices: mono for what the machine says, Inter for what people read. */
+  .lbl{font:500 11.5px/1.2 var(--font-mono);color:var(--muted);letter-spacing:.01em}
+  .lbl b{color:var(--ink);font-weight:700}
+  code{font:12px var(--font-mono);background:var(--line2);padding:1px 5px;overflow-wrap:anywhere}
+
+  /* Back to the launcher — shown only when the launcher served this file (see script below). */
+  .back{display:inline-flex;align-items:center;gap:6px;margin:0 0 22px;font:500 12px/1 var(--font-mono);
+    color:var(--ink);text-decoration:underline;text-decoration-color:var(--soft);text-underline-offset:4px}
+  .back:hover{text-decoration-color:var(--ink)}
+  .back svg{flex:none}
+  :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  @media print{.back{display:none!important}}
+
+  .head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .head svg{flex:none}
+  h1{font-size:23px;margin:0;font-weight:700;letter-spacing:-.02em;line-height:1.25}
+  .meta{display:flex;flex-wrap:wrap;gap:6px 22px;margin:0 0 26px}
+
+  .panel{background:var(--panel);border:1px solid var(--line);margin-bottom:18px}
+  .ph{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    padding:16px 20px;border-bottom:1px solid var(--line)}
+
+  /* Severity strip: five cells divided by hairlines, a mark over a number. */
+  .strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+  .cell{padding:16px 20px 18px;border-right:1px solid var(--line2)}
+  .cell:last-child{border-right:0}
+  .num{display:block;margin-top:12px;font:700 32px/1.1 var(--font-mono);letter-spacing:-.03em;
+    font-variant-numeric:tabular-nums}
+  .num.z{color:var(--muted);font-weight:400}
+  .num.c{color:var(--crit)} .num.h{color:var(--high)}
+
+  /* Severity mark — 3px colour bar + uppercase code (the only uppercase in the system). */
+  .s-crit{--c:var(--crit)} .s-high{--c:var(--high)} .s-med{--c:var(--med)}
+  .s-low{--c:var(--low)} .s-info{--c:var(--info)}
+  .sev{display:inline-flex;align-items:center;gap:8px;font:500 11.5px/1 var(--font-mono);
+    letter-spacing:.05em;color:var(--ink);white-space:nowrap}
+  .sev::before{content:"";width:3px;height:13px;background:var(--c,transparent);flex:none}
+
+  /* Findings table. */
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;min-width:640px}
+  th{font:500 11.5px/1.2 var(--font-mono);color:var(--muted);letter-spacing:.01em;text-align:left;
+    padding:12px;border-bottom:1px solid var(--line)}
+  td{padding:14px 12px;border-bottom:1px solid var(--line2);vertical-align:top;font-size:14px}
+  th:first-child,td:first-child{padding-left:20px}
+  th:last-child,td:last-child{padding-right:20px}
+  tbody tr:last-child td{border-bottom:0}
+  td.sevc{padding-top:17px}
+  td.tool{font:12.5px/1.55 var(--font-mono);color:var(--muted);white-space:nowrap}
+  th.n,td.n{text-align:right}
+  td.n{font:700 13px/1.55 var(--font-mono);font-variant-numeric:tabular-nums}
+  td.detail{font-size:13.5px;color:var(--muted)}
+
+  /* Hatch = "nothing here". */
+  .none{margin:20px;padding:14px 16px;border:1px solid var(--line);background:var(--hatch),var(--card);
+    font:12.5px/1.6 var(--font-mono);color:var(--muted)}
+
+  footer{color:var(--muted);font-size:12.5px;margin-top:28px;line-height:1.7}
+
+  @media (max-width:640px){
+    body{padding:28px 16px 56px}
+    .strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .cell{border-bottom:1px solid var(--line2);padding:14px 16px}
+    .cell:nth-child(3){border-right:0}
+    .cell:nth-child(n+4){border-bottom:0}
+    .num{font-size:26px}
+    .ph{padding:14px 16px}
+  }
 </style>
 </head>
 <body>
 {% set ABBR = {'Critical':'CRIT','High':'HIGH','Medium':'MED','Low':'LOW','Info':'INFO'} %}
 {% set SEVCLS = {'Critical':'crit','High':'high','Medium':'med','Low':'low','Info':'info'} %}
 <div class="wrap">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-    <svg viewBox="-7 -4 96 96" width="32" height="34" style="flex:none" aria-label="Redkeep">
-      <style>.rk{stroke:var(--ink)}</style>
-      <path class="rk" d="M5 83 V5 H15 V19 H36 V5 H46 V19 H67 V5 H77 V83 H56 V60 A15 15 0 0 0 26 60 V83 Z"
-            fill="none" stroke-width="10" stroke-linejoin="miter"/>
+  <a class="back" id="back" href="/" hidden><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M10 6H2M5.5 2.5 2 6l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>back to launcher</a>
+  <script>
+    /* The same file is opened straight from disk too; only offer the link when the launcher serves it. */
+    if (/^https?:$/.test(location.protocol) && location.pathname.indexOf('/report/') === 0) {
+      document.getElementById('back').hidden = false;
+    }
+  </script>
+  <div class="head">
+    <svg viewBox="-7 -4 96 96" width="32" height="34" aria-label="Redkeep">
+      <path d="M5 83 V5 H15 V19 H36 V5 H46 V19 H67 V5 H77 V83 H56 V60 A15 15 0 0 0 26 60 V83 Z"
+            fill="none" style="stroke:var(--ink)" stroke-width="10" stroke-linejoin="miter"/>
     </svg>
-    <h1 style="margin:0">Redkeep VAPT report: {{ product }}</h1>
+    <h1>Redkeep VAPT report: {{ product }}</h1>
   </div>
-  <p class="sub">Engagement <strong>{{ engagement }}</strong>&nbsp;&nbsp;&nbsp;generated {{ generated }}&nbsp;&nbsp;&nbsp;source <code>{{ run_dir }}</code></p>
+  <p class="meta">
+    <span class="lbl">engagement <b>{{ engagement }}</b></span>
+    <span class="lbl">generated <b>{{ generated }}</b></span>
+    <span class="lbl">source <code>{{ run_dir }}</code></span>
+  </p>
 
-  <div class="panel">
-    <div class="cards">
+  <section class="panel" aria-label="Findings by severity">
+    <div class="strip">
       {% for sev in severity_order %}
-      <div class="card">
-        <div class="n">{{ summary[sev] }}</div>
-        <div class="l"><span class="sev sev-{{ SEVCLS[sev] }}">{{ ABBR[sev] }}</span></div>
+      {% set n = summary[sev] %}
+      <div class="cell">
+        <span class="sev s-{{ SEVCLS[sev] }}">{{ ABBR[sev] }}</span>
+        <span class="num{% if n == 0 %} z{% elif sev == 'Critical' %} c{% elif sev == 'High' %} h{% endif %}">{{ n }}</span>
       </div>
       {% endfor %}
     </div>
-  </div>
+  </section>
 
-  <div class="panel">
-    <h2 style="margin:0 0 12px;font-size:16px">Findings ({{ findings|length }})</h2>
+  <section class="panel">
+    <div class="ph">
+      <span class="lbl">findings</span>
+      <span class="lbl"><b>{{ findings|length }}</b> rows</span>
+    </div>
     {% if findings %}
+    <div class="scroll">
     <table>
       <thead>
-        <tr><th>Severity</th><th>Finding</th><th>Tool</th><th>Count</th><th>Detail / reference</th></tr>
+        <tr><th>severity</th><th>finding</th><th>tool</th><th class="n">count</th><th>detail / reference</th></tr>
       </thead>
       <tbody>
         {% for f in findings %}
         <tr>
-          <td><span class="sev sev-{{ SEVCLS[f.severity] }}">{{ ABBR[f.severity] }}</span></td>
+          <td class="sevc"><span class="sev s-{{ SEVCLS[f.severity] }}">{{ ABBR[f.severity] }}</span></td>
           <td>{{ f.name }}</td>
           <td class="tool">{{ f.tool }}</td>
-          <td>{{ f.count }}</td>
-          <td>{{ f.detail }}{% if f.reference %} <code>{{ f.reference }}</code>{% endif %}</td>
+          <td class="n">{{ f.count }}</td>
+          <td class="detail">{{ f.detail }}{% if f.reference %} <code>{{ f.reference }}</code>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
-    <p class="sub">No parsed findings in this run. Check the raw tool output in the run directory.</p>
+    <p class="none">No parsed findings in this run. Check the raw tool output in the run directory.</p>
     {% endif %}
-  </div>
+  </section>
 
   <footer>
     Generated by Redkeep. Findings are aligned to OWASP WSTG, OWASP API Security Top 10,
