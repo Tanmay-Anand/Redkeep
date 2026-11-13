@@ -59,3 +59,5 @@ no_implicit_optional = true
 # Redkeep is a scanner: it shells out to fixed command vectors (no shell=True)
 # and the UI uses a command whitelist. The subprocess checks are intentional.
 skips = ["B404", "B603", "B607"]
+# Tests use plain `assert` (pytest style), which B101 flags; keep B101 on for real code.
+exclude_dirs = ["ui/tests", "runner/tests"]
