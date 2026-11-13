@@ -41,6 +41,10 @@ targets:
   network:
     - name: "lab-subnet"
       cidr: "172.30.0.0/24"
+      # Always skipped, automatically: the lab gateway (172.30.0.1 — the host machine,
+      # which forwards every port the host publishes) and the toolbox container itself.
+      # List any other addresses in the range that are not lab targets:
+      # exclude: ["172.30.0.250"]
 
 # --- AUTH (Phase 4) ------------------------------------------------------------
 # Mechanism to be confirmed from the target app at Phase 4 (JWT vs session).

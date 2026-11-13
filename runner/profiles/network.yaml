@@ -1,4 +1,6 @@
 # Network-only convenience profile.
 network:
   nmap_args: ["-sV", "-sC", "-p-", "-T4"]
+  host_timeout: "15m"   # nmap skips a host after this, so one slow host can't stall the pass
+  timeout: 3600         # seconds per tool run; a timeout is logged and the scan carries on
   metasploit: true

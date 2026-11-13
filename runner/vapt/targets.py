@@ -9,11 +9,20 @@ before launching a tool. A target is allowed only if:
 
 Anything else raises :class:`TargetNotAllowed` and the pass aborts before a
 single packet is sent.
+
+Being inside an allowed CIDR is not enough on its own: the lab network also holds
+**infrastructure** that is not a lab target — the Docker gateway (the host machine,
+which forwards every port the host publishes, e.g. a developer's own databases) and
+the toolbox container itself. Single-host targets that are infrastructure are
+refused, and network sweeps exclude them (see :func:`network_exclusions`).
 """
 from __future__ import annotations
 
+import functools
 import ipaddress
 import socket
+from collections.abc import Iterable
+from pathlib import Path
 from urllib.parse import urlparse
 
 from .config import Config
@@ -73,6 +82,92 @@ def _cidr_within(cidr: str, allowed: list[str]) -> bool:
     return False
 
 
+# --- infrastructure on the lab network ------------------------------------------
+_ROUTE_TABLE = Path("/proc/net/route")
+# Names Docker Desktop / Docker Engine give the host machine inside containers.
+_HOST_ALIASES = ("host.docker.internal", "gateway.docker.internal")
+
+
+def _default_gateway(route_table: Path = _ROUTE_TABLE) -> str | None:
+    """IPv4 default gateway from the Linux routing table, or None if unavailable."""
+    try:
+        lines = route_table.read_text(encoding="ascii").splitlines()[1:]
+    except OSError:
+        return None
+    for line in lines:
+        f = line.split()
+        if len(f) > 2 and f[1] == "00000000" and f[2] != "00000000":   # destination 0.0.0.0
+            return str(ipaddress.IPv4Address(bytes.fromhex(f[2])[::-1]))  # little-endian hex
+    return None
+
+
+def _own_ipv4s() -> set[str]:
+    try:
+        infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+    except OSError:
+        return set()
+    return {str(i[4][0]) for i in infos} - {"127.0.0.1"}
+
+
+@functools.lru_cache(maxsize=1)
+def infrastructure_ips() -> frozenset[str]:
+    """Addresses that must never be scanned as lab targets.
+
+    The Docker gateway (from the routing table), the host-machine aliases Docker
+    provides, and this container's own addresses. Cached: they don't change mid-run.
+    """
+    ips: set[str] = set(_own_ipv4s())
+    gw = _default_gateway()
+    if gw:
+        ips.add(gw)
+    for name in _HOST_ALIASES:
+        try:
+            ips.add(socket.gethostbyname(name))
+        except OSError:
+            continue
+    return frozenset(ips)
+
+
+def _first_host(net: ipaddress.IPv4Network | ipaddress.IPv6Network) -> str | None:
+    """Docker gives a bridge network's gateway the first usable address by default."""
+    return str(net.network_address + 1) if net.num_addresses > 2 else None
+
+
+def _is_infrastructure(ip: str, cfg: Config) -> bool:
+    if ip in infrastructure_ips():
+        return True
+    for c in cfg.allowed_cidrs:
+        try:
+            net = ipaddress.ip_network(c, strict=False)
+        except ValueError:
+            continue
+        if ip == _first_host(net):
+            return True
+    return False
+
+
+def network_exclusions(cidr: str, extra: Iterable[str] = ()) -> list[str]:
+    """Addresses inside ``cidr`` that a sweep of it must skip, sorted.
+
+    Infrastructure (:func:`infrastructure_ips`), the network's first host (Docker's
+    default gateway address, excluded even when the routing table can't be read), and
+    any ``extra`` addresses configured on the target.
+    """
+    net = ipaddress.ip_network(cidr, strict=False)
+    candidates = set(infrastructure_ips()) | set(extra)
+    first = _first_host(net)
+    if first:
+        candidates.add(first)
+    inside = []
+    for c in candidates:
+        try:
+            if ipaddress.ip_address(c) in net:
+                inside.append(c)
+        except ValueError:
+            continue
+    return sorted(inside, key=ipaddress.ip_address)
+
+
 def assert_allowed(target: str, cfg: Config) -> str:
     """Return the validated host/target, or raise :class:`TargetNotAllowed`.
 
@@ -104,6 +199,12 @@ def assert_allowed(target: str, cfg: Config) -> str:
             "resolved to an allowed IP. Refusing (safety gate)."
         ) from None
     if _in_allowed_cidr(ip, cfg.allowed_cidrs):
+        if _is_infrastructure(ip, cfg):
+            raise TargetNotAllowed(
+                f"host {host!r} resolves to {ip}, the lab network's gateway or this "
+                "toolbox — that is the host machine or Redkeep itself, not a lab "
+                "target. Refusing (safety gate)."
+            )
         return host
 
     raise TargetNotAllowed(

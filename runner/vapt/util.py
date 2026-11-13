@@ -42,6 +42,16 @@ def ensure_tool(name: str) -> str:
     return path
 
 
+TIMEOUT_RC = 124
+
+
+def _as_text(data: bytes | str | None) -> str:
+    """TimeoutExpired carries bytes even when the run used text=True."""
+    if data is None:
+        return ""
+    return data.decode("utf-8", "replace") if isinstance(data, bytes) else data
+
+
 def run(cmd: list[str], *, cwd: Path | None = None, check: bool = False,
         timeout: int | None = None) -> subprocess.CompletedProcess:
     """Run a command, streaming a one-line summary. Returns the completed proc.
@@ -50,10 +60,23 @@ def run(cmd: list[str], *, cwd: Path | None = None, check: bool = False,
     they find issues; callers decide what a failure means.
     """
     log("$ " + " ".join(cmd))
-    proc = subprocess.run(
-        cmd, cwd=str(cwd) if cwd else None,
-        capture_output=True, text=True, timeout=timeout,
-    )
+    try:
+        proc = subprocess.run(
+            cmd, cwd=str(cwd) if cwd else None,
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as e:
+        # One slow tool must not end the engagement: subprocess has already killed it,
+        # so record the timeout and let the caller carry on with whatever output exists
+        # (later passes and the report still run). 124 is the conventional timeout code.
+        warn(f"{cmd[0]} timed out after {timeout}s and was stopped; continuing with "
+             "any partial output")
+        proc = subprocess.CompletedProcess(cmd, TIMEOUT_RC, _as_text(e.stdout),
+                                           _as_text(e.stderr))
+        if check:
+            raise subprocess.CalledProcessError(proc.returncode, cmd,
+                                                proc.stdout, proc.stderr) from None
+        return proc
     if proc.returncode != 0:
         warn(f"{cmd[0]} exited {proc.returncode}")
         if proc.stderr:

@@ -1,6 +1,8 @@
 # Quick pass — fast, light-touch. Good for a smoke check between changes.
 network:
   nmap_args: ["-sV", "-T4", "--top-ports", "100"]
+  host_timeout: "5m"   # nmap skips a host after this, so one slow host can't stall the pass
+  timeout: 3600         # seconds per tool run; a timeout is logged and the scan carries on
   metasploit: false
 web:
   zap:
